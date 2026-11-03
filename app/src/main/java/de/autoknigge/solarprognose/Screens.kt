@@ -555,7 +555,7 @@ fun SettingsScreen(vm: MainViewModel, activity: ComponentActivity, onBack: () ->
                 Text("Uhrzeit (ungefähr)", color = Muted, fontSize = 13.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(6, 7, 8, 9).forEach { h ->
-                        FilterChip(selected = vm.notifyHour == h, onClick = { vm.setNotifyHour(h) }, label = { Text("$h Uhr") })
+                        FilterChip(selected = vm.notifyHour == h, onClick = { vm.changeNotifyHour(h) }, label = { Text("$h Uhr") })
                     }
                 }
             }

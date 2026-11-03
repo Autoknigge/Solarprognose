@@ -107,7 +107,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (on) Scheduler.scheduleDaily(ctx, notifyHour) else Scheduler.cancelDaily(ctx)
     }
 
-    fun setNotifyHour(hour: Int) {
+    fun changeNotifyHour(hour: Int) {
         notifyHour = hour
         store.notifyHour = hour
         if (notifyOn) Scheduler.scheduleDaily(ctx, hour)
