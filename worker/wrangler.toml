@@ -1,0 +1,9 @@
+name = "solarprognose-api"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+# Eigene Domain statt workers.dev: Der Zwischenspeicher (Cache API) funktioniert nur dort.
+# Der Name muss in der Cloudflare-Zone autoknigge.de frei sein.
+routes = [
+  { pattern = "solar-api.autoknigge.de", custom_domain = true }
+]
