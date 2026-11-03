@@ -72,4 +72,4 @@ Lokaler Test des Workers: `node worker/test/test.mjs`.
 - `Work.kt`, `Widget.kt`: Benachrichtigung und Widget (WorkManager)
 - `Ads.kt`: Einwilligung, Banner, App-Start-Anzeige
 - `worker/`: Cloudflare Worker (Abruf-Server) mit Tests
-- `docs/`: Datenschutzerklärung (Entwurf) und Store-Eintrag
+- `docs/`: Store-Eintrag (die Datenschutzerklärung liegt im Repo der Webseite unter `solarprognose/datenschutz.html`)

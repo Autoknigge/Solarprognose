@@ -34,7 +34,7 @@ Eine Idee von autoknigge.de
 
 - **Kategorie:** Wetter (alternativ Tools)
 - **Kontakt:** E-Mail-Adresse, Website https://autoknigge.de
-- **Datenschutzerklärung:** https://autoknigge.de/solarprognose/ (Vorlage: `docs/datenschutz.html`)
+- **Datenschutzerklärung:** https://autoknigge.de/solarprognose/datenschutz.html
 - **Werbung:** „Enthält Werbung“ = Ja
 - **Zielgruppe:** nicht für Kinder; ab 18 oder „13 und älter“ wählen, keine Kinder als Zielgruppe
 - **Inhaltsfreigabe (Fragebogen):** keine Gewalt, keine Nutzerinhalte, keine Käufe; Ergebnis voraussichtlich „USK 0 / PEGI 3“

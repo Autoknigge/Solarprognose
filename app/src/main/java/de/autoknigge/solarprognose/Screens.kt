@@ -80,7 +80,7 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
 
-const val PRIVACY_URL = "https://autoknigge.de/solarprognose/"
+const val PRIVACY_URL = "https://autoknigge.de/solarprognose/datenschutz.html"
 const val HOME_URL = "https://autoknigge.de"
 
 enum class Screen { Home, Edit, Settings }
