@@ -93,38 +93,9 @@ enum class Screen { Home, Edit, Settings }
 @Composable
 fun SolarRoot(activity: ComponentActivity) {
     val vm: MainViewModel = viewModel()
-    val store = remember { Store(activity) }
     var screen by remember { mutableStateOf(if (vm.plants.isEmpty()) Screen.Edit else Screen.Home) }
     var editId by remember { mutableStateOf<String?>(null) }
-    val firstRun = remember { !store.adInfoSeen }
-    var adInfoOk by remember { mutableStateOf(store.adInfoSeen) }
-    var adsReady by remember { mutableStateOf(false) }
-
-    LaunchedEffect(adInfoOk) {
-        if (adInfoOk) Ads.start(activity, showAppOpen = !firstRun) { adsReady = true }
-    }
-
     BackHandler(enabled = screen != Screen.Home && vm.plants.isNotEmpty()) { screen = Screen.Home }
-
-    if (!adInfoOk) {
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text("Kostenlos dank Werbung") },
-            text = {
-                Text(
-                    "Solarprognose ist kostenlos und wird durch Werbung finanziert. " +
-                        "Im nächsten Schritt fragt dich Google, welche Art von Werbung du zulassen möchtest. " +
-                        "Deine Anlagendaten bleiben auf dem Gerät. Details stehen in der Datenschutzerklärung unter Einstellungen."
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    store.adInfoSeen = true
-                    adInfoOk = true
-                }) { Text("Weiter") }
-            }
-        )
-    }
 
     Column(Modifier.fillMaxSize().background(Forest).safeDrawingPadding()) {
         Box(Modifier.weight(1f)) {
@@ -154,7 +125,6 @@ fun SolarRoot(activity: ComponentActivity) {
                 Screen.Settings -> SettingsScreen(vm = vm, activity = activity, onBack = { screen = Screen.Home })
             }
         }
-        if (adsReady) BannerAd()
     }
 }
 
@@ -593,12 +563,9 @@ fun SettingsScreen(vm: MainViewModel, activity: ComponentActivity, onBack: () ->
             )
         }
 
-        SectionCard(title = "Datenschutz, Impressum und Werbung") {
+        SectionCard(title = "Datenschutz und Impressum") {
             TextButton(onClick = { uri.openUri(PRIVACY_URL) }) { Text("Datenschutzerklärung öffnen") }
             TextButton(onClick = { uri.openUri(IMPRINT_URL) }) { Text("Impressum öffnen") }
-            if (Ads.privacyOptionsRequired(ctx)) {
-                TextButton(onClick = { Ads.showPrivacyOptions(activity) }) { Text("Werbe-Einstellungen ändern") }
-            }
         }
 
         SectionCard(title = "Info") {

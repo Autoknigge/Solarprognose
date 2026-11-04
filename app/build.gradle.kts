@@ -7,7 +7,6 @@ plugins {
 }
 
 // Werte kommen aus Gradle-Properties oder Umgebungsvariablen (GitHub-Secrets).
-// Ohne Angabe gelten die Test-IDs von Google, damit nie versehentlich echte Werbung klickbar ist.
 fun setting(name: String, fallback: String): String =
     (project.findProperty(name) as String?)?.takeIf { it.isNotBlank() }
         ?: System.getenv(name)?.takeIf { it.isNotBlank() }
@@ -26,15 +25,9 @@ android {
         versionCode = setting("VERSION_CODE", "1").toInt()
         versionName = setting("VERSION_NAME", "1.0")
 
-        val admobApp = setting("ADMOB_APP_ID", "ca-app-pub-3940256099942544~3347511713")
-        val admobBanner = setting("ADMOB_BANNER_ID", "ca-app-pub-3940256099942544/9214589741")
-        val admobOpen = setting("ADMOB_APPOPEN_ID", "ca-app-pub-3940256099942544/9257395921")
         val apiBase = setting("API_BASE_URL", "")
         val appToken = setting("APP_TOKEN", "")
 
-        manifestPlaceholders["admobAppId"] = admobApp
-        buildConfigField("String", "ADMOB_BANNER_ID", "\"$admobBanner\"")
-        buildConfigField("String", "ADMOB_APPOPEN_ID", "\"$admobOpen\"")
         buildConfigField("String", "API_BASE_URL", "\"$apiBase\"")
         buildConfigField("String", "APP_TOKEN", "\"$appToken\"")
     }
@@ -101,6 +94,4 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.10.2")
 
-    implementation("com.google.android.gms:play-services-ads:24.4.0")
-    implementation("com.google.android.ump:user-messaging-platform:3.2.0")
 }

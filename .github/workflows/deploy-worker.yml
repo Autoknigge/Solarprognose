@@ -8,6 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,8 +26,19 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           secrets: |
-            OPEN_METEO_API_KEY
             APP_TOKEN
         env:
-          OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
           APP_TOKEN: ${{ secrets.APP_TOKEN }}
+
+      # Nur wenn ein bezahlter Open-Meteo-Schlüssel hinterlegt ist; sonst nutzt der Worker die kostenlose Schnittstelle.
+      - name: Open-Meteo-Schlüssel setzen
+        if: ${{ env.OPEN_METEO_API_KEY != '' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          secrets: |
+            OPEN_METEO_API_KEY
+        env:
+          OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}

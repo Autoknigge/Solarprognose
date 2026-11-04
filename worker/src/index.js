@@ -2,7 +2,8 @@
 // Hält den Open-Meteo-Schlüssel, nimmt nur geprüfte Parameter an und merkt sich Antworten.
 //
 // Secrets (nicht im Code):
-//   OPEN_METEO_API_KEY  Schlüssel des kostenpflichtigen Open-Meteo-Tarifs
+//   OPEN_METEO_API_KEY  optional: Schlüssel des kostenpflichtigen Open-Meteo-Tarifs. Ohne Schlüssel nutzt der Worker
+//                       die kostenlose Schnittstelle (nur nicht-kommerzielle Nutzung, Fair-Use-Grenzen von Open-Meteo)
 //   APP_TOKEN           optional, einfacher Zugangscode, den die App im Header X-App-Token mitschickt
 
 const FORECAST_TTL = 1800; // 30 Minuten: Open-Meteo aktualisiert stündlich
@@ -46,6 +47,14 @@ async function upstream(url) {
   return { text: await r.text() };
 }
 
+// Mit Schlüssel: kostenpflichtige Hosts (customer-*), ohne Schlüssel: kostenlose Hosts.
+function openMeteo(env, kind, query) {
+  const key = env.OPEN_METEO_API_KEY;
+  const host = key ? `customer-${kind}` : kind;
+  const path = kind === "api" ? "v1/forecast" : "v1/search";
+  return `https://${host}.open-meteo.com/${path}?${query}` + (key ? `&apikey=${encodeURIComponent(key)}` : "");
+}
+
 async function forecast(url, env, ctx) {
   let lat = num(url, "latitude");
   let lon = num(url, "longitude");
@@ -62,13 +71,15 @@ async function forecast(url, env, ctx) {
   az = Math.round(az);
 
   return cached(ctx, `https://cache.invalid/forecast/${lat}/${lon}/${tilt}/${az}`, FORECAST_TTL, () => {
-    const u =
-      "https://customer-api.open-meteo.com/v1/forecast" +
-      `?latitude=${lat}&longitude=${lon}` +
-      "&hourly=global_tilted_irradiance,temperature_2m,cloud_cover" +
-      `&tilt=${tilt}&azimuth=${az}&forecast_days=7&timezone=auto` +
-      `&apikey=${encodeURIComponent(env.OPEN_METEO_API_KEY)}`;
-    return upstream(u);
+    return upstream(
+      openMeteo(
+        env,
+        "api",
+        `latitude=${lat}&longitude=${lon}` +
+          "&hourly=global_tilted_irradiance,temperature_2m,cloud_cover" +
+          `&tilt=${tilt}&azimuth=${az}&forecast_days=7&timezone=auto`
+      )
+    );
   });
 }
 
@@ -77,18 +88,13 @@ async function search(url, env, ctx) {
   if (name.length < 2 || name.length > 60) return json({ error: "bad_name" }, 400);
 
   return cached(ctx, `https://cache.invalid/search/${encodeURIComponent(name.toLowerCase())}`, SEARCH_TTL, () => {
-    const u =
-      "https://customer-geocoding-api.open-meteo.com/v1/search" +
-      `?name=${encodeURIComponent(name)}&count=8&language=de&format=json` +
-      `&apikey=${encodeURIComponent(env.OPEN_METEO_API_KEY)}`;
-    return upstream(u);
+    return upstream(openMeteo(env, "geocoding-api", `name=${encodeURIComponent(name)}&count=8&language=de&format=json`));
   });
 }
 
 export default {
   async fetch(request, env, ctx) {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
-    if (!env.OPEN_METEO_API_KEY) return json({ error: "not_configured" }, 500);
     if (env.APP_TOKEN && request.headers.get("x-app-token") !== env.APP_TOKEN) {
       return json({ error: "unauthorized" }, 401);
     }

@@ -35,7 +35,7 @@ Eine Idee von autoknigge.de
 - **Kategorie:** Wetter (alternativ Tools)
 - **Kontakt:** E-Mail-Adresse, Website https://autoknigge.de (Impressum: https://autoknigge.de/impressum.html, in der App unter Einstellungen verlinkt)
 - **Datenschutzerklärung:** https://autoknigge.de/solarprognose/datenschutz.html
-- **Werbung:** „Enthält Werbung“ = Ja
+- **Werbung:** „Enthält Werbung“ = Nein
 - **Zielgruppe:** nicht für Kinder; ab 18 oder „13 und älter“ wählen, keine Kinder als Zielgruppe
 - **Inhaltsfreigabe (Fragebogen):** keine Gewalt, keine Nutzerinhalte, keine Käufe; Ergebnis voraussichtlich „USK 0 / PEGI 3“
 - **App-Zugriff:** keine Anmeldung nötig
@@ -44,10 +44,10 @@ Eine Idee von autoknigge.de
 ## Angaben zur Datensicherheit (Data safety)
 
 - **Daten erhoben/geteilt:** Standort wird nicht vom Gerät erhoben (kein GPS). Der vom Nutzer gewählte Ort geht an den eigenen Abruf-Server bei Cloudflare und von dort an Open-Meteo.
-- **Über AdMob (Google):** Geräte- oder andere Kennungen (Werbe-ID), App-Interaktionen und Diagnosedaten, Zweck „Werbung“, Daten werden mit Google geteilt.
+- **Datenerhebung durch Dritte:** keine Werbe- oder Analyse-SDKs in der App. Der Abruf läuft über den eigenen Server bei Cloudflare zu Open-Meteo, siehe Datenschutzerklärung.
 - **Verschlüsselung bei der Übertragung:** Ja (HTTPS).
 - **Löschung beantragen:** Daten liegen nur lokal, Deinstallation löscht sie.
-- Die Angaben im Formular sollten zu den Einstellungen deines AdMob-Kontos passen. Bitte prüfe sie gegen die aktuelle Google-Dokumentation zum SDK, bevor du absendest.
+- Bitte prüfe die Angaben im Formular gegen die aktuelle Google-Dokumentation, bevor du absendest.
 
 ## Grafiken, die du noch brauchst
 
@@ -58,7 +58,7 @@ Eine Idee von autoknigge.de
 
 ## Vor der Veröffentlichung
 
-1. Echte AdMob-Kennungen als GitHub-Secrets setzen (siehe README), sonst läuft nur Test-Werbung.
-2. Open-Meteo-Tarif abschließen und den Worker einrichten (siehe README, Abschnitte Open-Meteo und Worker). `API_BASE_URL` und `APP_TOKEN` müssen vor dem Release-Build als Secrets gesetzt sein, sonst ruft die App direkt die kostenlose Schnittstelle ab.
+1. Nichts zu tun für Werbung: Die App enthält keine.
+2. Den Worker einrichten (siehe README, Abschnitt Worker). `API_BASE_URL` und `APP_TOKEN` müssen vor dem Release-Build als Secrets gesetzt sein, sonst ruft die App direkt die kostenlose Schnittstelle ab. Ein bezahlter Open-Meteo-Tarif ist optional, siehe README.
 3. Neue private Entwicklerkonten brauchen vor der Veröffentlichung meist einen geschlossenen Test mit mehreren Testern über mehrere Wochen. Aktuelle Zahl in der Play Console unter „Test und Veröffentlichung“ nachlesen.
 4. Release als Tag anlegen (zum Beispiel `1.0`), die Datei `Solarprognose.aab` im Release hochladen.

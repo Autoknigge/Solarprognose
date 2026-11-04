@@ -8,9 +8,8 @@ import java.net.URLEncoder
 
 /**
  * Zwei Betriebsarten:
- * - API_BASE_URL gesetzt: Die App spricht nur den eigenen Worker an (Release mit Werbung). Der Open-Meteo-Schlüssel liegt dort.
- * - API_BASE_URL leer: Direktabruf bei Open-Meteo über die kostenlose Schnittstelle. Nur für private Tests erlaubt,
- *   weil Apps mit Werbung laut Nutzungsbedingungen einen kostenpflichtigen Tarif brauchen.
+ * - API_BASE_URL gesetzt: Die App spricht nur den eigenen Worker an (Release). Ein Open-Meteo-Schlüssel, falls vorhanden, liegt dort.
+ * - API_BASE_URL leer: Direktabruf bei Open-Meteo über die kostenlose Schnittstelle (für Tests auf dem eigenen Handy).
  */
 object Api {
     private val proxy: String = BuildConfig.API_BASE_URL.trim().trimEnd('/')

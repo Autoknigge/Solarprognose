@@ -89,6 +89,14 @@ assert.equal(r.status, 200);
 // 7. Sonstiges
 assert.equal((await call("/forecast?latitude=1&longitude=1&tilt=1&azimuth=1", { "x-app-token": "geheim" }, env, "POST")).status, 405);
 assert.equal((await call("/irgendwas")).status, 404);
-assert.equal((await call("/", { "x-app-token": "geheim" }, {})).status, 500, "ohne Schlüssel klare Fehlermeldung");
+
+// 8. Ohne Schlüssel: kostenlose Hosts, kein apikey
+const n0 = upstreamCalls.length;
+r = await call("/forecast?latitude=30&longitude=30&tilt=30&azimuth=0", {}, {});
+assert.equal(r.status, 200);
+assert.match(upstreamCalls[n0], /^https:\/\/api\.open-meteo\.com\/v1\/forecast\?latitude=30&longitude=30&/);
+assert.ok(!upstreamCalls[n0].includes("apikey"));
+r = await call("/search?name=Hannover", {}, {});
+assert.match(upstreamCalls.at(-1), /^https:\/\/geocoding-api\.open-meteo\.com\/v1\/search\?name=Hannover&count=8&language=de&format=json$/);
 
 console.log("Alle Worker-Tests bestanden");

@@ -15,16 +15,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Alle Werte sind optional. Ohne sie nutzt die App Googles Test-Werbung, Debug-Signatur
+      # Alle Werte sind optional. Ohne sie nutzt die App Debug-Signatur
       # und den kostenlosen Direktabruf bei Open-Meteo (nur für private Tests erlaubt).
       # Mit API_BASE_URL (Adresse des Workers) und APP_TOKEN läuft die App über den eigenen Worker.
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
       KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
       KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-      ADMOB_APP_ID: ${{ secrets.ADMOB_APP_ID }}
-      ADMOB_BANNER_ID: ${{ secrets.ADMOB_BANNER_ID }}
-      ADMOB_APPOPEN_ID: ${{ secrets.ADMOB_APPOPEN_ID }}
       API_BASE_URL: ${{ secrets.API_BASE_URL }}
       APP_TOKEN: ${{ secrets.APP_TOKEN }}
     steps:

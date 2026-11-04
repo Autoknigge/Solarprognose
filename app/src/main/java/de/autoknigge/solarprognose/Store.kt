@@ -41,12 +41,6 @@ class Store(context: Context) {
             sp.edit().putInt("notify_hour", v).apply()
         }
 
-    /** Hinweis zur Werbefinanzierung wurde schon gezeigt. */
-    var adInfoSeen: Boolean
-        get() = sp.getBoolean("ad_info_seen", false)
-        set(v) {
-            sp.edit().putBoolean("ad_info_seen", v).apply()
-        }
 
     fun saveSummary(s: Summary) {
         sp.edit().putString("summary", s.toJson()).apply()
