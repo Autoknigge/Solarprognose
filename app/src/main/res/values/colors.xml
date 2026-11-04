@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="forest">#FF0B2A21</color>
+    <color name="icon_bg">#FF0C2A06</color>
     <color name="panel">#FF123A2E</color>
     <color name="gold">#FFE3B341</color>
     <color name="gold_soft">#FFF3D27A</color>

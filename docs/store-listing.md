@@ -51,7 +51,7 @@ Eine Idee von autoknigge.de
 
 ## Grafiken, die du noch brauchst
 
-- App-Symbol 512 × 512 px (aus `ic_launcher_foreground.xml`: goldene Sonne auf Tannengrün)
+- App-Symbol 512 × 512 px: `docs/app-icon-512.png` (dasselbe Bild wie das Symbol auf dem Handy)
 - Logo für die Kopfzeile der App und Grundlage für die Funktionsgrafik: `docs/logo-solarprognose.png` (1139 × 537 px; die Funktionsgrafik muss 1024 × 500 px groß sein, also leicht zuschneiden)
 - Funktionsgrafik 1024 × 500 px
 - Mindestens 2, besser 4 bis 8 Screenshots vom Handy (Startseite, Diagramme, Anlage bearbeiten, Widget, Einstellungen)
