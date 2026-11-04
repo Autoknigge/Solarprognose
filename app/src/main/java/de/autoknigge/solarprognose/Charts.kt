@@ -255,7 +255,11 @@ fun DailyChart(
                         )
                     )
                 }
-                drawPath(path, color = if (selected == null || selected == k) Gold else Gold.copy(alpha = 0.55f))
+                val barColor = if (k == 0) TodayOrange else {
+                    val t = if (days.size <= 2) 1f else (k - 1).toFloat() / (days.size - 2)
+                    androidx.compose.ui.graphics.lerp(GoldDark, GoldLight, t)
+                }
+                drawPath(path, color = if (selected == null || selected == k) barColor else barColor.copy(alpha = 0.55f))
             }
             nativeCanvas.drawText(Calc.fmt1(d.kwh), cx, minOf(y, base - 2.dp.toPx()) - 6.dp.toPx(), paints.barLabel)
             nativeCanvas.drawText(if (k == 0) "Heute" else Calc.weekday(d.date), cx, base + 17.dp.toPx(), if (k == 0) paints.dayToday else paints.day)

@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyRow
@@ -82,6 +86,7 @@ import kotlin.math.roundToInt
 
 const val PRIVACY_URL = "https://autoknigge.de/solarprognose/datenschutz.html"
 const val HOME_URL = "https://autoknigge.de"
+const val IMPRINT_URL = "https://autoknigge.de/impressum.html"
 
 enum class Screen { Home, Edit, Settings }
 
@@ -109,7 +114,7 @@ fun SolarRoot(activity: ComponentActivity) {
                 Text(
                     "Solarprognose ist kostenlos und wird durch Werbung finanziert. " +
                         "Im nächsten Schritt fragt dich Google, welche Art von Werbung du zulassen möchtest. " +
-                        "Deine Anlagendaten bleiben auf dem Gerät."
+                        "Deine Anlagendaten bleiben auf dem Gerät. Details stehen in der Datenschutzerklärung unter Einstellungen."
                 )
             },
             confirmButton = {
@@ -227,7 +232,14 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Solarprognose", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.weight(1f))
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                Image(
+                    painter = painterResource(R.drawable.logo_header),
+                    contentDescription = "Solarprognose",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.height(40.dp).aspectRatio(1139f / 537f).clip(RoundedCornerShape(8.dp))
+                )
+            }
             IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, contentDescription = "Aktualisieren", tint = Ink) }
             IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, contentDescription = "Einstellungen", tint = Ink) }
         }
@@ -336,11 +348,23 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 "Wetterdaten von Open-Meteo.com (CC BY 4.0). Die Werte sind eine Schätzung ohne Verschattung und Schnee.",
                 fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
             )
-            Text(
-                "Eine Idee von autoknigge.de",
-                fontSize = 12.sp, color = Muted, textDecoration = TextDecoration.Underline,
-                modifier = Modifier.clickable { uri.openUri(HOME_URL) }.padding(vertical = 4.dp)
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    "Eine Idee von autoknigge.de",
+                    fontSize = 12.sp, color = Muted, textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable { uri.openUri(HOME_URL) }.padding(vertical = 6.dp)
+                )
+                Text(
+                    "Datenschutz",
+                    fontSize = 12.sp, color = Muted, textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable { uri.openUri(PRIVACY_URL) }.padding(vertical = 6.dp)
+                )
+                Text(
+                    "Impressum",
+                    fontSize = 12.sp, color = Muted, textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable { uri.openUri(IMPRINT_URL) }.padding(vertical = 6.dp)
+                )
+            }
         }
     }
 }
@@ -569,10 +593,11 @@ fun SettingsScreen(vm: MainViewModel, activity: ComponentActivity, onBack: () ->
             )
         }
 
-        SectionCard(title = "Datenschutz und Werbung") {
+        SectionCard(title = "Datenschutz, Impressum und Werbung") {
             TextButton(onClick = { uri.openUri(PRIVACY_URL) }) { Text("Datenschutzerklärung öffnen") }
+            TextButton(onClick = { uri.openUri(IMPRINT_URL) }) { Text("Impressum öffnen") }
             if (Ads.privacyOptionsRequired(ctx)) {
-                TextButton(onClick = { Ads.showPrivacyOptions(activity) }) { Text("Werbe-Einwilligung ändern") }
+                TextButton(onClick = { Ads.showPrivacyOptions(activity) }) { Text("Werbe-Einstellungen ändern") }
             }
         }
 

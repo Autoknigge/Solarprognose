@@ -33,7 +33,7 @@ Eine Idee von autoknigge.de
 ## Einstellungen in der Play Console
 
 - **Kategorie:** Wetter (alternativ Tools)
-- **Kontakt:** E-Mail-Adresse, Website https://autoknigge.de
+- **Kontakt:** E-Mail-Adresse, Website https://autoknigge.de (Impressum: https://autoknigge.de/impressum.html, in der App unter Einstellungen verlinkt)
 - **Datenschutzerklärung:** https://autoknigge.de/solarprognose/datenschutz.html
 - **Werbung:** „Enthält Werbung“ = Ja
 - **Zielgruppe:** nicht für Kinder; ab 18 oder „13 und älter“ wählen, keine Kinder als Zielgruppe
@@ -52,6 +52,7 @@ Eine Idee von autoknigge.de
 ## Grafiken, die du noch brauchst
 
 - App-Symbol 512 × 512 px (aus `ic_launcher_foreground.xml`: goldene Sonne auf Tannengrün)
+- Logo für die Kopfzeile der App und Grundlage für die Funktionsgrafik: `docs/logo-solarprognose.png` (1139 × 537 px; die Funktionsgrafik muss 1024 × 500 px groß sein, also leicht zuschneiden)
 - Funktionsgrafik 1024 × 500 px
 - Mindestens 2, besser 4 bis 8 Screenshots vom Handy (Startseite, Diagramme, Anlage bearbeiten, Widget, Einstellungen)
 
