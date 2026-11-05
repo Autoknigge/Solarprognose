@@ -33,6 +33,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var fetchedAt by mutableLongStateOf(0L)
         private set
 
+    /** Langzeit-Monatserträge je kWp (PVGIS), falls geladen. */
+    var year by mutableStateOf<List<Double>?>(null)
+        private set
+
+    /** Börsenpreise ab heute, falls geladen. */
+    var prices by mutableStateOf<List<PriceHour>?>(null)
+        private set
+
     var notifyOn by mutableStateOf(store.notifyOn)
         private set
 
@@ -52,10 +60,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun showCached(p: Plant) {
         raw = Repo.cached(ctx, p)
         fetchedAt = if (raw != null) Repo.cachedTime(ctx, p) else 0L
+        year = Extras.cachedYear(ctx, p)
+        prices = Extras.cachedPrices(ctx)
+    }
+
+    /** Jahreswerte und Börsenpreise sind Zugaben: Fehler dabei stören die Hauptansicht nicht. */
+    private fun refreshExtras(p: Plant) {
+        viewModelScope.launch {
+            try {
+                val y = Extras.loadYear(ctx, p)
+                if (selectedId == p.id) year = y
+            } catch (e: Exception) {
+            }
+        }
+        viewModelScope.launch {
+            try {
+                prices = Extras.loadPrices(ctx)
+            } catch (e: Exception) {
+            }
+        }
     }
 
     fun refresh() {
         val p = selected ?: return
+        refreshExtras(p)
         viewModelScope.launch {
             loading = true
             error = null
@@ -97,6 +125,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             selectedId = next
             store.selectedId = next
             raw = null
+            year = null
             if (next != null) select(next)
         }
     }

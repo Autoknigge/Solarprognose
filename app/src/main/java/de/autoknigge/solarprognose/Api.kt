@@ -12,10 +12,12 @@ import java.net.URLEncoder
  * - API_BASE_URL leer: Direktabruf bei Open-Meteo über die kostenlose Schnittstelle (für Tests auf dem eigenen Handy).
  */
 object Api {
-    private val proxy: String = BuildConfig.API_BASE_URL.trim().trimEnd('/')
+    internal val proxy: String = BuildConfig.API_BASE_URL.trim().trimEnd('/')
     private val token: String = BuildConfig.APP_TOKEN
 
-    private fun get(url: String, sendToken: Boolean): String {
+    val hasProxy: Boolean get() = proxy.isNotBlank()
+
+    internal fun get(url: String, sendToken: Boolean): String {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 15_000
         c.readTimeout = 20_000
@@ -34,7 +36,7 @@ object Api {
         if (proxy.isNotBlank()) return get("$proxy/forecast?$params", true)
         return get(
             "https://api.open-meteo.com/v1/forecast?$params" +
-                "&hourly=global_tilted_irradiance,temperature_2m,cloud_cover&forecast_days=7&timezone=auto",
+                "&hourly=global_tilted_irradiance,temperature_2m,cloud_cover,precipitation&forecast_days=7&timezone=auto",
             false
         )
     }

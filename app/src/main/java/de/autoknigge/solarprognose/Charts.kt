@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -25,6 +26,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.Locale
 
 private val GridColor = Color(0xFF2B5848).copy(alpha = 0.55f)
 private val AxisColor = Color(0xFF2B5848)
@@ -264,6 +269,203 @@ fun DailyChart(
             nativeCanvas.drawText(Calc.fmt1(d.kwh), cx, minOf(y, base - 2.dp.toPx()) - 6.dp.toPx(), paints.barLabel)
             nativeCanvas.drawText(if (k == 0) "Heute" else Calc.weekday(d.date), cx, base + 17.dp.toPx(), if (k == 0) paints.dayToday else paints.day)
             nativeCanvas.drawText(Calc.dm(d.date), cx, base + 31.dp.toPx(), paints.tickCenter)
+        }
+    }
+}
+
+
+private val MONTHS = arrayOf("Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez")
+
+/** Senkrechtes Balkendiagramm der Monatserträge. Der aktuelle Monat ist orange, die anderen laufen von dunklem zu hellem Gold. */
+@Composable
+fun MonthChart(
+    values: List<Double>,
+    currentMonth: Int,
+    selected: Int?,
+    onSelect: (Int?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val paints = remember(density) { ChartPaints(with(density) { 10.sp.toPx() }, with(density) { 10.5.sp.toPx() }) }
+    val n = values.size
+
+    fun monthAt(x: Float, width: Float, m: Float): Int {
+        val band = (width - 2 * m) / n
+        return ((x - m) / band).toInt().coerceIn(0, n - 1)
+    }
+
+    Canvas(
+        modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .pointerInput(n) {
+                detectTapGestures { off -> onSelect(monthAt(off.x, size.width.toFloat(), 4.dp.toPx())) }
+            }
+            .pointerInput(n) {
+                detectHorizontalDragGestures { change, _ -> onSelect(monthAt(change.position.x, size.width.toFloat(), 4.dp.toPx())) }
+            }
+    ) {
+        val w = size.width
+        val h = size.height
+        val m = 4.dp.toPx()
+        val mt = 22.dp.toPx()
+        val mb = 22.dp.toPx()
+        val ih = h - mt - mb
+        val band = (w - 2 * m) / n
+        val bw = band * 0.72f
+        val base = mt + ih
+        val maxV = maxOf(1.0, values.maxOrNull() ?: 1.0)
+        val nativeCanvas = drawContext.canvas.nativeCanvas
+
+        drawLine(color = AxisColor, start = Offset(m, base), end = Offset(w - m, base), strokeWidth = 1.dp.toPx())
+
+        values.forEachIndexed { k, v ->
+            val cx = m + band * (k + 0.5f)
+            val x = cx - bw / 2
+            val y = base - (v / (maxV * 1.12) * ih).toFloat()
+            val bh = base - y
+            val c0 = if (k == currentMonth) TodayOrange else androidx.compose.ui.graphics.lerp(GoldDark, GoldLight, k / (n - 1f))
+            val c = if (selected == null || selected == k) c0 else c0.copy(alpha = 0.55f)
+            if (bh > 0.5f) {
+                val r = minOf(3.dp.toPx(), bh / 2)
+                val path = Path().apply {
+                    addRoundRect(
+                        RoundRect(
+                            left = x, top = y, right = x + bw, bottom = base,
+                            topLeftCornerRadius = CornerRadius(r),
+                            topRightCornerRadius = CornerRadius(r),
+                            bottomRightCornerRadius = CornerRadius.Zero,
+                            bottomLeftCornerRadius = CornerRadius.Zero
+                        )
+                    )
+                }
+                drawPath(path, color = c)
+            }
+            nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", v), cx, minOf(y, base - 2.dp.toPx()) - 5.dp.toPx(), paints.barLabel)
+            nativeCanvas.drawText(MONTHS[k], cx, base + 15.dp.toPx(), if (k == currentMonth) paints.dayToday else paints.tickCenter)
+        }
+    }
+}
+
+/** Börsenpreis je Stunde (ct/kWh) für heute und morgen. Günstig grün, teuer orange, die aktuelle Stunde mit Rahmen. */
+@Composable
+fun PriceChart(
+    prices: List<PriceHour>,
+    nowSec: Long,
+    selected: Int?,
+    onSelect: (Int?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val paints = remember(density) { ChartPaints(with(density) { 10.sp.toPx() }, with(density) { 11.sp.toPx() }) }
+    val zone = remember { ZoneId.of("Europe/Berlin") }
+    val n = prices.size
+
+    fun indexAt(x: Float, width: Float, ml: Float, mr: Float): Int {
+        val band = (width - ml - mr) / n
+        return ((x - ml) / band).toInt().coerceIn(0, n - 1)
+    }
+
+    Canvas(
+        modifier
+            .fillMaxWidth()
+            .height(210.dp)
+            .pointerInput(n) {
+                detectTapGestures { off -> onSelect(indexAt(off.x, size.width.toFloat(), 34.dp.toPx(), 6.dp.toPx())) }
+            }
+            .pointerInput(n) {
+                detectHorizontalDragGestures { change, _ ->
+                    onSelect(indexAt(change.position.x, size.width.toFloat(), 34.dp.toPx(), 6.dp.toPx()))
+                }
+            }
+    ) {
+        val w = size.width
+        val h = size.height
+        val ml = 34.dp.toPx()
+        val mr = 6.dp.toPx()
+        val mt = 10.dp.toPx()
+        val mb = 36.dp.toPx()
+        val iw = w - ml - mr
+        val ih = h - mt - mb
+        val band = iw / n
+        val bw = band * 0.8f
+        val gap = (band - bw) / 2
+        val nativeCanvas = drawContext.canvas.nativeCanvas
+
+        val vals = prices.map { it.ct }
+        val lo = vals.minOrNull() ?: 0.0
+        val hi = vals.maxOrNull() ?: 1.0
+        val maxV = maxOf(1.0, hi)
+        val minV = minOf(0.0, lo)
+        var step = 1.0
+        for (s in doubleArrayOf(1.0, 2.0, 5.0, 10.0, 20.0, 50.0)) {
+            step = s
+            if ((maxV - minV) / s <= 5) break
+        }
+        val top = Math.ceil(maxV / step) * step
+        val bot = Math.floor(minV / step) * step
+        fun yOf(v: Double): Float = mt + ((top - v) / (top - bot) * ih).toFloat()
+        val base = h - mb
+
+        var g = bot
+        while (g <= top + 0.001) {
+            drawLine(
+                color = if (Math.abs(g) < 1e-9) AxisColor else GridColor,
+                start = Offset(ml, yOf(g)),
+                end = Offset(w - mr, yOf(g)),
+                strokeWidth = 1.dp.toPx()
+            )
+            nativeCanvas.drawText(Calc.fmt0(g), ml - 5.dp.toPx(), yOf(g) + 4.dp.toPx(), paints.tickRight)
+            g += step
+        }
+
+        val span = maxOf(hi - lo, 0.001)
+        val zeroY = yOf(0.0)
+        prices.forEachIndexed { i, p ->
+            val x = ml + band * i + gap
+            val y = yOf(p.ct)
+            val t = ((p.ct - lo) / span).toFloat()
+            val c0 = androidx.compose.ui.graphics.lerp(Color(0xFF6FCF97), TodayOrange, t)
+            val c = if (selected == null || selected == i) c0 else c0.copy(alpha = 0.55f)
+            val topY = minOf(y, zeroY)
+            val hh = maxOf(Math.abs(zeroY - y), 1f)
+            drawRect(color = c, topLeft = Offset(x, topY), size = Size(bw, hh))
+            if (nowSec >= p.start && nowSec < p.start + 3600) {
+                drawRect(
+                    color = Ink,
+                    topLeft = Offset(x - 1f, topY - 1f),
+                    size = Size(bw + 2f, hh + 2f),
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
+            }
+            val z = Instant.ofEpochSecond(p.start).atZone(zone)
+            if (z.hour % 6 == 0) nativeCanvas.drawText(z.hour.toString(), x + bw / 2, base + 14.dp.toPx(), paints.tickCenter)
+            if (z.hour == 0 && i > 0) {
+                drawLine(
+                    color = AxisColor,
+                    start = Offset(x - gap, mt),
+                    end = Offset(x - gap, base),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 8f))
+                )
+            }
+        }
+
+        val today = LocalDate.now(zone)
+        fun dateAt(i: Int): LocalDate = Instant.ofEpochSecond(prices[i].start).atZone(zone).toLocalDate()
+        var i = 0
+        while (i < n) {
+            val d = dateAt(i)
+            var j = i
+            while (j < n && dateAt(j) == d) j++
+            val cx = ml + band * (i + j) / 2f
+            val label = when (d) {
+                today -> "Heute"
+                today.plusDays(1) -> "Morgen"
+                else -> Calc.weekday(d.toString()) + " " + Calc.dm(d.toString())
+            }
+            nativeCanvas.drawText(label, cx, base + 30.dp.toPx(), if (d == today) paints.dayToday else paints.day)
+            i = j
         }
     }
 }

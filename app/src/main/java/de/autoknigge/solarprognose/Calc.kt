@@ -23,7 +23,8 @@ object Calc {
             time = List(n) { t.getString(it) },
             gti = arr("global_tilted_irradiance"),
             temp = arr("temperature_2m"),
-            cloud = arr("cloud_cover")
+            cloud = arr("cloud_cover"),
+            precip = if (h.has("precipitation")) arr("precipitation") else emptyList()
         )
     }
 
@@ -42,7 +43,8 @@ object Calc {
             var pw = p.kwp * 1000.0 * (g / 1000.0) * (1.0 - 0.004 * (tcell - 25.0)) * (p.eff / 100.0)
             if (p.limitW > 0) pw = minOf(pw, p.limitW.toDouble())
             pw = maxOf(0.0, pw)
-            hours.add(Hour(t, t.substring(0, 10), t.substring(11, 13).toInt(), g, temp, cloud, pw))
+            val rain = raw.precip.getOrNull(i)?.let { if (it.isNaN()) 0.0 else it } ?: 0.0
+            hours.add(Hour(t, t.substring(0, 10), t.substring(11, 13).toInt(), g, temp, cloud, pw, rain))
         }
         val days = ArrayList<Day>()
         var i = 0
@@ -55,6 +57,7 @@ object Calc {
             var cs = 0.0
             var cn = 0
             var ts = 0.0
+            var rain = 0.0
             while (j < hours.size && hours[j].date == date) {
                 val h = hours[j]
                 kwh += h.power / 1000.0
@@ -65,11 +68,12 @@ object Calc {
                 if (h.gti > 20.0) {
                     cs += h.cloud
                     cn++
+                    rain += h.precip
                 }
                 ts += h.temp
                 j++
             }
-            days.add(Day(date, i, j, kwh, peak, peakH, if (cn > 0) cs / cn else null, ts / (j - i)))
+            days.add(Day(date, i, j, kwh, peak, peakH, if (cn > 0) cs / cn else null, ts / (j - i), rain))
             i = j
         }
         return Forecast(raw.timezone, hours, days)

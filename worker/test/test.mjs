@@ -99,4 +99,31 @@ assert.ok(!upstreamCalls[n0].includes("apikey"));
 r = await call("/search?name=Hannover", {}, {});
 assert.match(upstreamCalls.at(-1), /^https:\/\/geocoding-api\.open-meteo\.com\/v1\/search\?name=Hannover&count=8&language=de&format=json$/);
 
+// 9. Jahreswerte (PVGIS): Prüfung, Rundung, Zwischenspeicher
+let n1 = upstreamCalls.length;
+r = await call("/yearly?latitude=52.8234&longitude=8.0456&tilt=35.4&azimuth=-10&loss=15.2");
+assert.equal(r.status, 200);
+assert.equal(upstreamCalls[n1], "https://re.jrc.ec.europa.eu/api/v5_3/PVcalc?lat=52.82&lon=8.05&peakpower=1&loss=15&angle=35&aspect=-10&outputformat=json");
+r = await call("/yearly?latitude=52.8201&longitude=8.0451&tilt=35&azimuth=-10&loss=15");
+assert.equal(upstreamCalls.length, n1 + 1, "Jahreswerte kommen aus dem Zwischenspeicher");
+for (const q of [
+  "/yearly?latitude=52&longitude=8&tilt=35&azimuth=0",
+  "/yearly?latitude=52&longitude=8&tilt=35&azimuth=0&loss=80",
+  "/yearly?latitude=99&longitude=8&tilt=35&azimuth=0&loss=14",
+  "/yearly?latitude=52&longitude=8&tilt=95&azimuth=0&loss=14",
+]) {
+  r = await call(q);
+  assert.equal(r.status, 400, q);
+}
+
+// 10. Börsenpreise: nur erlaubte Zonen, Datumsbereich, Zwischenspeicher
+n1 = upstreamCalls.length;
+r = await call("/prices?bzn=DE-LU");
+assert.equal(r.status, 200);
+assert.match(upstreamCalls[n1], /^https:\/\/api\.energy-charts\.info\/price\?bzn=DE-LU&start=\d{4}-\d{2}-\d{2}&end=\d{4}-\d{2}-\d{2}$/);
+r = await call("/prices");
+assert.equal(upstreamCalls.length, n1 + 1, "Preise kommen aus dem Zwischenspeicher");
+r = await call("/prices?bzn=XX%26evil");
+assert.equal(r.status, 400);
+
 console.log("Alle Worker-Tests bestanden");

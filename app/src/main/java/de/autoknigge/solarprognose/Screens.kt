@@ -151,21 +151,24 @@ fun SectionCard(title: String, modifier: Modifier = Modifier, trailing: @Composa
 }
 
 @Composable
-fun Tile(label: String, value: String, unit: String?, note: String, modifier: Modifier = Modifier) {
+fun Tile(label: String, value: String, unit: String?, note: String, modifier: Modifier = Modifier, icon: WeatherKind? = null) {
     val shape = RoundedCornerShape(14.dp)
-    Column(
+    Box(
         modifier
             .clip(shape)
             .background(Brush.verticalGradient(listOf(Panel2, Panel)))
             .border(1.dp, Gold.copy(alpha = 0.55f), shape)
             .padding(12.dp)
     ) {
-        Text(label.uppercase(Locale.GERMAN), fontSize = 11.sp, letterSpacing = 0.8.sp, color = Muted)
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(value, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Ink)
-            if (unit != null) Text(" $unit", fontSize = 13.sp, color = Muted, modifier = Modifier.padding(bottom = 4.dp))
+        Column {
+            Text(label.uppercase(Locale.GERMAN), fontSize = 11.sp, letterSpacing = 0.8.sp, color = Muted)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(value, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Ink)
+                if (unit != null) Text(" $unit", fontSize = 13.sp, color = Muted, modifier = Modifier.padding(bottom = 4.dp))
+            }
+            Text(note, fontSize = 12.sp, color = Muted, lineHeight = 16.sp)
         }
-        Text(note, fontSize = 12.sp, color = Muted, lineHeight = 16.sp)
+        if (icon != null) WeatherIcon(icon, Modifier.align(Alignment.TopEnd))
     }
 }
 
@@ -198,6 +201,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
         }
     }
     val nowC = remember(forecast, tick) { forecast?.let { Calc.nowCoord(it) } }
+    val nowSec = remember(tick) { System.currentTimeMillis() / 1000 }
     val uri = LocalUriHandler.current
 
     Column(Modifier.fillMaxSize()) {
@@ -256,14 +260,17 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile("Heute", Calc.fmt1(d0.kwh), "kWh", if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
-                        Modifier.weight(1f).fillMaxHeight())
+                        Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(d0))
                     Tile("Morgen", d1?.let { Calc.fmt1(it.kwh) } ?: "–", "kWh", d1?.let { "Spitze " + Calc.fmt0(it.peak) + " W gegen " + it.peakHour + " Uhr" } ?: "",
-                        Modifier.weight(1f).fillMaxHeight())
+                        Modifier.weight(1f).fillMaxHeight(), icon = d1?.let { Extras.kindOf(it) })
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile("7 Tage", Calc.fmt0(total), "kWh", "Ø " + Calc.fmt1(total / forecast.days.size) + " kWh pro Tag", Modifier.weight(1f).fillMaxHeight())
                     Tile("Bester Tag", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight())
                 }
+
+                if (rest != null) TodayCard(total = d0.kwh, rest = rest)
+                vm.prices?.let { pr -> if (pr.isNotEmpty()) PriceCard(pr, nowSec) }
 
                 SectionCard(
                     title = "Leistung pro Stunde (Watt)",
@@ -297,6 +304,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     DailyChart(f = forecast, selected = sd, onSelect = { selDay = it })
                 }
 
+                vm.year?.let { y -> YearCard(plant, y) }
+
                 SectionCard(title = "Tabelle") {
                     Row(Modifier.fillMaxWidth()) {
                         listOf("Tag" to 1.3f, "Ertrag" to 1f, "Spitze" to 1f, "Wolken" to 0.9f).forEach { (t, w) ->
@@ -315,7 +324,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
             }
 
             Text(
-                "Wetterdaten von Open-Meteo.com (CC BY 4.0). Die Werte sind eine Schätzung ohne Verschattung und Schnee.",
+                "Wetterdaten: Open-Meteo.com (CC BY 4.0). Jahreswerte: PVGIS, Europäische Kommission (JRC). Börsenpreise: Energy-Charts, Fraunhofer ISE (CC BY 4.0). Die Werte sind eine Schätzung ohne Verschattung und Schnee.",
                 fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
             )
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -572,6 +581,8 @@ fun SettingsScreen(vm: MainViewModel, activity: ComponentActivity, onBack: () ->
             Text("Version " + BuildConfig.VERSION_NAME, color = Ink, fontSize = 14.sp)
             Text(
                 "Wetter- und Strahlungsdaten: Open-Meteo.com, Lizenz CC BY 4.0. " +
+                    "Jahreswerte: PVGIS, Europäische Kommission (JRC). " +
+                    "Börsenpreise: Energy-Charts, Fraunhofer ISE, Lizenz CC BY 4.0. " +
                     "Die Prognose ist eine Modellrechnung und kein Messwert.",
                 color = Muted, fontSize = 13.sp
             )

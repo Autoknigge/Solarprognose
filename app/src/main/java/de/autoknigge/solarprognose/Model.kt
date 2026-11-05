@@ -52,7 +52,8 @@ data class Raw(
     val time: List<String>,
     val gti: List<Double>,
     val temp: List<Double>,
-    val cloud: List<Double>
+    val cloud: List<Double>,
+    val precip: List<Double> = emptyList()
 )
 
 /** Eine Stunde. Der Wert gilt für die Stunde, die zur angegebenen Uhrzeit endet. */
@@ -63,7 +64,8 @@ data class Hour(
     val gti: Double,
     val temp: Double,
     val cloud: Double,
-    val power: Double
+    val power: Double,
+    val precip: Double = 0.0
 )
 
 data class Day(
@@ -74,7 +76,8 @@ data class Day(
     val peak: Double,
     val peakHour: Int,
     val cloudAvg: Double?,
-    val tempAvg: Double
+    val tempAvg: Double,
+    val rainMm: Double = 0.0
 )
 
 data class Forecast(val timezone: String, val hours: List<Hour>, val days: List<Day>)
