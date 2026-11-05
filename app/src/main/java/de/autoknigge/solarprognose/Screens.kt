@@ -277,7 +277,15 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 }
 
                 if (rest != null) TodayCard(total = d0.kwh, rest = rest)
-                vm.prices?.let { pr -> if (pr.isNotEmpty()) PriceCard(pr, nowSec) }
+
+                SectionCard(title = "Ertrag pro Tag (kWh)") {
+                    val sd = selDay
+                    Text(
+                        if (sd != null && sd < forecast.days.size) dayInfo(forecast.days[sd]) else "Tippe auf einen Balken für Details.\n ",
+                        fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp
+                    )
+                    DailyChart(f = forecast, selected = sd, onSelect = { selDay = it })
+                }
 
                 SectionCard(
                     title = "Leistung pro Stunde (Watt)",
@@ -302,14 +310,6 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     )
                 }
 
-                SectionCard(title = "Ertrag pro Tag (kWh)") {
-                    val sd = selDay
-                    Text(
-                        if (sd != null && sd < forecast.days.size) dayInfo(forecast.days[sd]) else "Tippe auf einen Balken für Details.\n ",
-                        fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp
-                    )
-                    DailyChart(f = forecast, selected = sd, onSelect = { selDay = it })
-                }
 
                 vm.year?.let { y -> YearCard(plant, y) }
 
@@ -328,6 +328,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         }
                     }
                 }
+
+                vm.prices?.let { pr -> if (pr.isNotEmpty()) PriceCard(pr, nowSec) }
             }
 
             Text(
