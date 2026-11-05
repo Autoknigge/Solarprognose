@@ -120,10 +120,13 @@ object Extras {
         return out
     }
 
-    fun cachedPrices(ctx: Context): List<PriceHour>? = try {
-        parsePrices(prefs(ctx).getString("prices_json", null) ?: return null)
-    } catch (e: Exception) {
-        null
+    fun cachedPrices(ctx: Context): List<PriceHour>? {
+        val json = prefs(ctx).getString("prices_json", null) ?: return null
+        return try {
+            parsePrices(json)
+        } catch (e: Exception) {
+            null
+        }
     }
 
     suspend fun loadPrices(ctx: Context): List<PriceHour> = withContext(Dispatchers.IO) {
