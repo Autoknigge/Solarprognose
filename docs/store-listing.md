@@ -15,7 +15,10 @@ Du gibst Ort, Modulleistung, Neigung und Ausrichtung deiner Anlage an. Die App h
 
 • Leistung pro Stunde als Kurve, für 2 oder 7 Tage
 • Ertrag pro Tag in kWh
-• Heute, morgen, beste Tage der Woche auf einen Blick
+• Heute, morgen, beste Tage der Woche auf einen Blick, mit Wettersymbol
+• Heute im Verlauf: Prognose, bisher erzeugte Menge und erwarteter Rest
+• Jahresprognose pro Monat als Balkendiagramm
+• Börsenstrompreis pro Stunde für heute und morgen
 • Wolken und Temperatur zu jeder Stunde
 
 Mehr davon:
@@ -26,7 +29,7 @@ Mehr davon:
 • Verluste und Wechselrichter-Grenze einstellbar
 • Kein Konto, keine Anmeldung, deine Anlagendaten bleiben auf dem Gerät
 
-Die Werte sind eine Modellrechnung auf Basis von Wetterdaten (Open-Meteo, CC BY 4.0). Verschattung und Schnee sind nicht berücksichtigt.
+Die Werte sind eine Modellrechnung auf Basis von Wetterdaten (Open-Meteo, CC BY 4.0). Jahreswerte: PVGIS der Europäischen Kommission. Börsenpreise: Energy-Charts, Fraunhofer ISE (CC BY 4.0). Verschattung und Schnee sind nicht berücksichtigt.
 
 Eine Idee von autoknigge.de
 

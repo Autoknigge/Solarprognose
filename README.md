@@ -2,7 +2,7 @@
 
 Android-App (Kotlin, Jetpack Compose) für die erwartete Solarstromerzeugung. Paketname `de.autoknigge.solarprognose`.
 
-Funktionen in Version 1.0: Stundenkurve (2 oder 7 Tage), Tagesertrag, Tabelle, mehrere Anlagen, Startbildschirm-Widget, tägliche Benachrichtigung. Die App ist kostenlos und enthält keine Werbung.
+Funktionen in Version 1.0: Stundenkurve (2 oder 7 Tage), Tagesertrag mit Wettersymbol, Heute im Verlauf, Jahresprognose pro Monat (PVGIS), Börsenstrompreis (Energy-Charts), Tabelle, mehrere Anlagen, Startbildschirm-Widget, tägliche Benachrichtigung. Die App ist kostenlos und enthält keine Werbung.
 
 ## Erster Build
 
@@ -65,6 +65,7 @@ Lokaler Test des Workers: `node worker/test/test.mjs`.
 
 - `Calc.kt`: Leistungsrechnung (Einstrahlung, Temperaturverlust, Wirkungsgrad, Grenze)
 - `Api.kt`, `Repo.kt`, `Store.kt`: Abruf, Zwischenspeicher, lokale Daten
+- `Extras.kt`, `ExtraViews.kt`: Jahreswerte (PVGIS), Börsenpreise, Wettersymbole, zusätzliche Karten
 - `Screens.kt`, `Charts.kt`, `Theme.kt`: Oberfläche
 - `Work.kt`, `Widget.kt`: Benachrichtigung und Widget (WorkManager)
 - `worker/`: Cloudflare Worker (Abruf-Server) mit Tests
