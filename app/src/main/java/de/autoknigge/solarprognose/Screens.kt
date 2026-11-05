@@ -206,12 +206,19 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            // Logo 3 mm höher als zuvor (40 dp + rund 19 dp), daneben klein die Versionsnummer
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
                 Image(
                     painter = painterResource(R.drawable.logo_header),
                     contentDescription = "Solarprognose",
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.height(40.dp).aspectRatio(1139f / 537f).clip(RoundedCornerShape(8.dp))
+                    modifier = Modifier.height(59.dp).aspectRatio(1139f / 537f).clip(RoundedCornerShape(10.dp))
+                )
+                Text(
+                    BuildConfig.VERSION_NAME,
+                    fontSize = 10.sp,
+                    color = Muted,
+                    modifier = Modifier.padding(start = 6.dp, bottom = 3.dp)
                 )
             }
             IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, contentDescription = "Aktualisieren", tint = Ink) }
