@@ -45,6 +45,7 @@ private class ChartPaints(sizeTick: Float, sizeDay: Float) {
 
     val tickRight = paint(Muted, sizeTick, Paint.Align.RIGHT)
     val tickCenter = paint(Muted, sizeTick, Paint.Align.CENTER)
+    val tickLeft = paint(Muted, sizeTick, Paint.Align.LEFT)
     val day = paint(Ink, sizeDay, Paint.Align.CENTER)
     val dayToday = paint(Ink, sizeDay, Paint.Align.CENTER, bold = true)
     val now = paint(Muted, sizeTick, Paint.Align.CENTER)
@@ -466,6 +467,177 @@ fun PriceChart(
             }
             nativeCanvas.drawText(label, cx, base + 30.dp.toPx(), if (d == today) paints.dayToday else paints.day)
             i = j
+        }
+    }
+}
+
+
+/** Temperatur (Linie, linke Achse) und Bewölkung (Fläche, rechte Achse) pro Stunde. Gleiche Zeitachse wie [HourlyChart]. */
+@Composable
+fun WeatherChart(
+    f: Forecast,
+    count: Int,
+    nowC: Double?,
+    selected: Int?,
+    onSelect: (Int?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val paints = remember(density) { ChartPaints(with(density) { 11.sp.toPx() }, with(density) { 12.sp.toPx() }) }
+    val n = minOf(count, f.hours.size)
+    val two = n <= 48
+
+    fun indexAt(x: Float, width: Float, ml: Float, mr: Float): Int {
+        val iw = width - ml - mr
+        val c = (x - ml) / iw * n
+        return Math.round(c + 0.5).toInt().coerceIn(1, maxOf(1, n - 1))
+    }
+
+    Canvas(
+        modifier
+            .fillMaxWidth()
+            .height(230.dp)
+            .pointerInput(n) {
+                detectTapGestures { off -> onSelect(indexAt(off.x, size.width.toFloat(), 40.dp.toPx(), 40.dp.toPx())) }
+            }
+            .pointerInput(n) {
+                detectHorizontalDragGestures { change, _ ->
+                    onSelect(indexAt(change.position.x, size.width.toFloat(), 40.dp.toPx(), 40.dp.toPx()))
+                }
+            }
+    ) {
+        val w = size.width
+        val h = size.height
+        val ml = 40.dp.toPx()
+        val mr = 40.dp.toPx()
+        val mt = 12.dp.toPx()
+        val mb = (if (two) 46 else 42).dp.toPx()
+        val iw = w - ml - mr
+        val ih = h - mt - mb
+        val base = mt + ih
+        val nativeCanvas = drawContext.canvas.nativeCanvas
+
+        var tMin = Double.MAX_VALUE
+        var tMax = -Double.MAX_VALUE
+        for (i in 1 until n) {
+            tMin = minOf(tMin, f.hours[i].temp)
+            tMax = maxOf(tMax, f.hours[i].temp)
+        }
+        if (tMin > tMax) {
+            tMin = 0.0
+            tMax = 1.0
+        }
+        var step = 1.0
+        for (s in doubleArrayOf(1.0, 2.0, 5.0, 10.0, 20.0)) {
+            step = s
+            if ((tMax - tMin) / s <= 5) break
+        }
+        val lo = Math.floor(tMin / step) * step
+        var hi = Math.ceil(tMax / step) * step
+        if (hi <= lo) hi = lo + step
+
+        fun xOf(c: Double): Float = ml + (c / n * iw).toFloat()
+        fun yT(v: Double): Float = mt + ih - ((v - lo) / (hi - lo) * ih).toFloat()
+        fun yC(v: Double): Float = mt + ih - (v.coerceIn(0.0, 100.0) / 100.0 * ih).toFloat()
+
+        // Raster und linke Achse (Temperatur)
+        var g = lo
+        while (g <= hi + 0.001) {
+            drawLine(
+                color = if (Math.abs(g) < 1e-9) AxisColor else GridColor,
+                start = Offset(ml, yT(g)),
+                end = Offset(w - mr, yT(g)),
+                strokeWidth = 1.dp.toPx()
+            )
+            nativeCanvas.drawText(Calc.fmt0(g), ml - 6.dp.toPx(), yT(g) + 4.dp.toPx(), paints.tickRight)
+            g += step
+        }
+        // rechte Achse (Bewölkung)
+        for (p in intArrayOf(0, 50, 100)) {
+            nativeCanvas.drawText("$p %", w - mr + 6.dp.toPx(), yC(p.toDouble()) + 4.dp.toPx(), paints.tickLeft)
+        }
+
+        // Tage: Trennlinien und Beschriftung
+        f.days.filter { it.start < n }.forEachIndexed { k, d ->
+            if (d.start > 0) {
+                drawLine(
+                    color = AxisColor,
+                    start = Offset(xOf(d.start.toDouble()), mt),
+                    end = Offset(xOf(d.start.toDouble()), base),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 8f))
+                )
+            }
+            val cx = xOf((d.start + minOf(d.end, n)) / 2.0)
+            val dayPaint = if (k == 0) paints.dayToday else paints.day
+            if (two) {
+                for (hh in intArrayOf(6, 12, 18)) {
+                    if (d.start + hh < n) {
+                        nativeCanvas.drawText(hh.toString(), xOf((d.start + hh).toDouble()), base + 15.dp.toPx(), paints.tickCenter)
+                    }
+                }
+                val name = when (k) {
+                    0 -> "Heute"
+                    1 -> "Morgen"
+                    else -> Calc.weekday(d.date)
+                }
+                nativeCanvas.drawText(name + " · " + Calc.weekday(d.date) + " " + Calc.dm(d.date), cx, base + 36.dp.toPx(), dayPaint)
+            } else {
+                nativeCanvas.drawText(if (k == 0) "Heute" else Calc.weekday(d.date), cx, base + 17.dp.toPx(), dayPaint)
+                nativeCanvas.drawText(Calc.dm(d.date), cx, base + 31.dp.toPx(), paints.tickCenter)
+            }
+        }
+
+        // Bewölkung als Fläche mit Linie
+        val cLine = Path()
+        val cArea = Path()
+        for (i in 1 until n) {
+            val x = xOf(i - 0.5)
+            val y = yC(f.hours[i].cloud)
+            if (i == 1) {
+                cLine.moveTo(x, y)
+                cArea.moveTo(x, base)
+                cArea.lineTo(x, y)
+            } else {
+                cLine.lineTo(x, y)
+                cArea.lineTo(x, y)
+            }
+        }
+        cArea.lineTo(xOf(n - 1 - 0.5), base)
+        cArea.close()
+        drawPath(cArea, color = CloudColor.copy(alpha = 0.22f))
+        drawPath(cLine, color = CloudColor, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Temperatur als Linie
+        val tLine = Path()
+        for (i in 1 until n) {
+            val x = xOf(i - 0.5)
+            val y = yT(f.hours[i].temp)
+            if (i == 1) tLine.moveTo(x, y) else tLine.lineTo(x, y)
+        }
+        drawPath(tLine, color = TempColor, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Jetzt-Markierung
+        if (nowC != null && nowC > 0 && nowC < n) {
+            val x = xOf(nowC)
+            drawLine(
+                color = Muted,
+                start = Offset(x, mt),
+                end = Offset(x, base),
+                strokeWidth = 1.5.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 9f))
+            )
+            nativeCanvas.drawText("jetzt", x, mt - 2.dp.toPx(), paints.now)
+        }
+
+        // Auswahl
+        if (selected != null && selected in 1 until n) {
+            val x = xOf(selected - 0.5)
+            drawLine(color = Ink.copy(alpha = 0.7f), start = Offset(x, mt), end = Offset(x, base), strokeWidth = 1.dp.toPx())
+            drawCircle(color = Forest, radius = 6.dp.toPx(), center = Offset(x, yT(f.hours[selected].temp)))
+            drawCircle(color = TempColor, radius = 4.dp.toPx(), center = Offset(x, yT(f.hours[selected].temp)))
+            drawCircle(color = Forest, radius = 6.dp.toPx(), center = Offset(x, yC(f.hours[selected].cloud)))
+            drawCircle(color = CloudColor, radius = 4.dp.toPx(), center = Offset(x, yC(f.hours[selected].cloud)))
         }
     }
 }

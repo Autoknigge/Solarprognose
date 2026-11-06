@@ -180,6 +180,13 @@ private fun hourInfo(f: Forecast, i: Int): String {
         Calc.fmt0(x.power) + " W · " + Calc.fmt0(x.gti) + " W/m² · Wolken " + Calc.fmt0(x.cloud) + " % · " + Calc.fmt0(x.temp) + " °C"
 }
 
+private fun wxInfo(f: Forecast, i: Int): String {
+    val x = f.hours[i]
+    return Calc.weekday(x.date) + " " + Calc.dm(x.date) + ", " + pad2((x.hour + 23) % 24) + "–" + pad2(x.hour) + " Uhr\n" +
+        "Temperatur " + Calc.fmt0(x.temp) + " °C · Bewölkung " + Calc.fmt0(x.cloud) + " %" +
+        (if (x.precip >= 0.1) " · Regen " + Calc.fmt1(x.precip) + " mm" else "")
+}
+
 private fun dayInfo(d: Day): String =
     Calc.weekday(d.date) + " " + Calc.dm(d.date) + ": " + Calc.fmt1(d.kwh) + " kWh\n" +
         "Spitze " + Calc.fmt0(d.peak) + " W gegen " + d.peakHour + " Uhr · Wolken " + (d.cloudAvg?.let { Calc.fmt0(it) + " %" } ?: "–")
@@ -193,6 +200,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
     var range by rememberSaveable { mutableIntStateOf(48) }
     var selHour by remember(plant.id) { mutableStateOf<Int?>(null) }
     var selDay by remember(plant.id) { mutableStateOf<Int?>(null) }
+    var selWx by remember(plant.id) { mutableStateOf<Int?>(null) }
     var tick by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -310,6 +318,33 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     )
                 }
 
+
+                SectionCard(
+                    title = "Bewölkung und Temperatur",
+                    trailing = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilterChip(selected = range == 48, onClick = { range = 48; selHour = null; selWx = null }, label = { Text("2 Tage") })
+                            FilterChip(selected = range != 48, onClick = { range = 168; selHour = null; selWx = null }, label = { Text("7 Tage") })
+                        }
+                    }
+                ) {
+                    val sw = selWx
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text("━ Temperatur (°C, links)", fontSize = 11.5.sp, color = TempColor)
+                        Text("▇ Bewölkung (%, rechts)", fontSize = 11.5.sp, color = CloudColor)
+                    }
+                    Text(
+                        if (sw != null && sw < forecast.hours.size) wxInfo(forecast, sw) else "Tippe oder wische ins Diagramm für Details.\n ",
+                        fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp
+                    )
+                    WeatherChart(
+                        f = forecast,
+                        count = if (range == 48) 48 else forecast.hours.size,
+                        nowC = nowC,
+                        selected = sw,
+                        onSelect = { selWx = it }
+                    )
+                }
 
                 vm.year?.let { y -> YearCard(plant, y) }
 
