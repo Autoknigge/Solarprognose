@@ -31,6 +31,8 @@ val CardPrice = Color(0xFF00674F)
 val CardPriceLine = Color(0xFF2FA283)
 val TileToday = Color(0xFFE35336)
 val TileTomorrow = Color(0xFFD47E30)
+val WarmMuted = Color(0xFFFFE8D6)
+val CloudColorLight = Color(0xFFE6F0F7)
 val DarkInk = Color(0xFF14231B)
 val DarkMuted = Color(0xFF34453B)
 
