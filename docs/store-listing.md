@@ -46,8 +46,8 @@ Eine Idee von autoknigge.de
 
 ## Angaben zur Datensicherheit (Data safety)
 
-- **Daten erhoben/geteilt:** Standort wird nicht vom Gerät erhoben (kein GPS). Der vom Nutzer gewählte Ort geht an den eigenen Abruf-Server bei Cloudflare und von dort an Open-Meteo.
-- **Datenerhebung durch Dritte:** keine Werbe- oder Analyse-SDKs in der App. Der Abruf läuft über den eigenen Server bei Cloudflare zu Open-Meteo, siehe Datenschutzerklärung.
+- **Daten erhoben/geteilt:** Standort wird nicht vom Gerät erhoben (kein GPS). Der vom Nutzer gewählte Ort geht direkt an Open-Meteo, PVGIS (EU-Kommission) und Energy-Charts (nur Preise, ohne Ortsangabe). Die Anbieter sehen dabei die IP-Adresse. Es gibt keinen eigenen Server.
+- **Datenerhebung durch Dritte:** keine Werbe- oder Analyse-SDKs in der App, siehe Datenschutzerklärung.
 - **Verschlüsselung bei der Übertragung:** Ja (HTTPS).
 - **Löschung beantragen:** Daten liegen nur lokal, Deinstallation löscht sie.
 - Bitte prüfe die Angaben im Formular gegen die aktuelle Google-Dokumentation, bevor du absendest.
@@ -62,6 +62,6 @@ Eine Idee von autoknigge.de
 ## Vor der Veröffentlichung
 
 1. Nichts zu tun für Werbung: Die App enthält keine.
-2. Den Worker einrichten (siehe README, Abschnitt Worker). `API_BASE_URL` und `APP_TOKEN` müssen vor dem Release-Build als Secrets gesetzt sein, sonst ruft die App direkt die kostenlose Schnittstelle ab. Ein bezahlter Open-Meteo-Tarif ist optional, siehe README.
+2. Die Secrets `API_BASE_URL` und `APP_TOKEN` leer lassen oder löschen: Die App ruft dann direkt Open-Meteo, PVGIS und Energy-Charts ab, so wie die Datenschutzerklärung es beschreibt. Der Worker ist optional (siehe README). Wird er später aktiviert, muss die Datenschutzerklärung wieder angepasst werden.
 3. Neue private Entwicklerkonten brauchen vor der Veröffentlichung meist einen geschlossenen Test mit mehreren Testern über mehrere Wochen. Aktuelle Zahl in der Play Console unter „Test und Veröffentlichung“ nachlesen.
 4. Release als Tag anlegen (zum Beispiel `1.0`), die Datei `Solarprognose.aab` im Release hochladen.
