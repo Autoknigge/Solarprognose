@@ -214,7 +214,7 @@ fun PriceCard(prices: List<PriceHour>, nowSec: Long) {
     val cheapest = todays.minByOrNull { it.ct }
     val dearest = todays.maxByOrNull { it.ct }
 
-    SectionCard(title = "Börsenstrompreis (ct/kWh)") {
+    SectionCard(title = "Börsenstrompreis (ct/kWh)", bg = CardPrice, borderColor = CardPriceLine) {
         val s = sel
         val text = if (s != null && s < prices.size) {
             val p = prices[s]

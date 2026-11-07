@@ -35,10 +35,17 @@ object Calc {
      * Leistung je Stunde: Modulleistung x Einstrahlung/1000 x Temperaturfaktor x Systemwirkungsgrad.
      * Zelltemperatur = Lufttemperatur + 0,031 K je W/m², Temperaturkoeffizient -0,4 %/K über 25 °C.
      */
-    fun compute(raw: Raw, p: Plant): Forecast {
+    fun compute(raw: Raw, p: Plant, keepPast: Boolean = false): Forecast {
+        val zone = try {
+            ZoneId.of(raw.timezone)
+        } catch (e: Exception) {
+            ZoneId.systemDefault()
+        }
+        val today = LocalDate.now(zone).toString()
         val hours = ArrayList<Hour>(raw.time.size)
         for (i in raw.time.indices) {
             val t = raw.time[i]
+            if (!keepPast && t.substring(0, 10) < today) continue
             val g = raw.gti[i].let { if (it.isNaN()) 0.0 else it }
             val temp = raw.temp[i].let { if (it.isNaN()) 10.0 else it }
             val cloud = raw.cloud[i].let { if (it.isNaN()) 0.0 else it }
@@ -90,7 +97,8 @@ object Calc {
             days.add(Day(date, i, j, kwh, peak, peakH, if (cn > 0) cs / cn else null, ts / (j - i), rain, snow, thunder, hail, gustMax))
             i = j
         }
-        return Forecast(raw.timezone, hours, days)
+        val ti = days.indexOfFirst { it.date >= today }.let { if (it < 0) 0 else it }
+        return Forecast(raw.timezone, hours, days, ti)
     }
 
     /** Aktuelle Position im Stundenraster (Index + Minutenanteil) oder null, wenn "jetzt" nicht im Datensatz liegt. */

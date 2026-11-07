@@ -37,7 +37,7 @@ let r = await call("/forecast?latitude=52.8234&longitude=8.0456&tilt=35.4&azimut
 assert.equal(r.status, 200);
 assert.equal(upstreamCalls.length, 1);
 assert.match(upstreamCalls[0], /^https:\/\/customer-api\.open-meteo\.com\/v1\/forecast\?latitude=52\.82&longitude=8\.05&/);
-assert.match(upstreamCalls[0], /tilt=35&azimuth=-10&forecast_days=7&timezone=auto&apikey=KEY123$/);
+assert.match(upstreamCalls[0], /tilt=35&azimuth=-10&forecast_days=7&past_days=2&timezone=auto&apikey=KEY123$/);
 assert.ok(!(await r.text()).includes("KEY123"));
 
 // 2. Zweiter Abruf aus dem Zwischenspeicher, auch bei leicht anderen Koordinaten

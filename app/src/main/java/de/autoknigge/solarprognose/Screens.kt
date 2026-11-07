@@ -67,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -137,6 +138,9 @@ fun SectionCard(
     trailing: @Composable (() -> Unit)? = null,
     bg: androidx.compose.ui.graphics.Color = Panel,
     borderColor: androidx.compose.ui.graphics.Color = Line,
+    inkColor: androidx.compose.ui.graphics.Color = Ink,
+    mutedColor: androidx.compose.ui.graphics.Color = Muted,
+    darken: Float = 0.45f,
     content: @Composable () -> Unit
 ) {
     val shape = RoundedCornerShape(14.dp)
@@ -144,36 +148,47 @@ fun SectionCard(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(cardBrush(bg))
+            .background(cardBrush(bg, darken))
             .border(1.dp, borderColor, shape)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Ink, modifier = Modifier.weight(1f))
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = inkColor, modifier = Modifier.weight(1f))
             trailing?.invoke()
         }
-        content()
+        androidx.compose.runtime.CompositionLocalProvider(LocalInk provides inkColor, LocalMuted provides mutedColor) {
+            content()
+        }
     }
 }
 
 @Composable
-fun Tile(label: String, value: String, unit: String?, note: String, modifier: Modifier = Modifier, icon: WeatherKind? = null) {
+fun Tile(
+    label: String,
+    value: String,
+    unit: String?,
+    note: String,
+    modifier: Modifier = Modifier,
+    icon: WeatherKind? = null,
+    bg: androidx.compose.ui.graphics.Color = Panel2,
+    mutedColor: androidx.compose.ui.graphics.Color = Muted
+) {
     val shape = RoundedCornerShape(14.dp)
     Box(
         modifier
             .clip(shape)
-            .background(cardBrush(Panel2))
+            .background(cardBrush(bg))
             .border(1.dp, Gold.copy(alpha = 0.55f), shape)
             .padding(12.dp)
     ) {
         Column {
-            Text(label.uppercase(Locale.GERMAN), fontSize = 11.sp, letterSpacing = 0.8.sp, color = Muted)
+            Text(label.uppercase(Locale.GERMAN), fontSize = 11.sp, letterSpacing = 0.8.sp, color = mutedColor)
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(value, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Ink)
-                if (unit != null) Text(" $unit", fontSize = 13.sp, color = Muted, modifier = Modifier.padding(bottom = 4.dp))
+                if (unit != null) Text(" $unit", fontSize = 13.sp, color = mutedColor, modifier = Modifier.padding(bottom = 4.dp))
             }
-            Text(note, fontSize = 12.sp, color = Muted, lineHeight = 16.sp)
+            Text(note, fontSize = 12.sp, color = mutedColor, lineHeight = 16.sp)
         }
         if (icon != null) WeatherIcon(icon, Modifier.align(Alignment.TopEnd))
     }
@@ -204,6 +219,8 @@ private fun dayInfo(d: Day): String =
 fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSettings: () -> Unit) {
     val plant = vm.selected ?: return
     val forecast = remember(vm.raw, plant) { vm.raw?.let { Calc.compute(it, plant) } }
+    // Mit 2 Tagen Rückblick für Ertrag pro Tag, Leistung, Bewölkung/Temperatur und Tabelle
+    val full = remember(vm.raw, plant) { vm.raw?.let { Calc.compute(it, plant, keepPast = true) } }
     var range by rememberSaveable { mutableIntStateOf(48) }
     var selHour by remember(plant.id) { mutableStateOf<Int?>(null) }
     var selDay by remember(plant.id) { mutableStateOf<Int?>(null) }
@@ -216,6 +233,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
         }
     }
     val nowC = remember(forecast, tick) { forecast?.let { Calc.nowCoord(it) } }
+    val nowFull = remember(full, tick) { full?.let { Calc.nowCoord(it) } }
     val nowSec = remember(tick) { System.currentTimeMillis() / 1000 }
     val uri = LocalUriHandler.current
 
@@ -282,9 +300,9 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile("Heute", Calc.fmt1(d0.kwh), "kWh", if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
-                        Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(d0))
+                        Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(d0), bg = TileToday, mutedColor = Color(0xFFFFE6DA))
                     Tile("Morgen", d1?.let { Calc.fmt1(it.kwh) } ?: "–", "kWh", d1?.let { "Spitze " + Calc.fmt0(it.peak) + " W gegen " + it.peakHour + " Uhr" } ?: "",
-                        Modifier.weight(1f).fillMaxHeight(), icon = d1?.let { Extras.kindOf(it) })
+                        Modifier.weight(1f).fillMaxHeight(), icon = d1?.let { Extras.kindOf(it) }, bg = TileTomorrow, mutedColor = Color(0xFFFFEBD6))
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile("7 Tage", Calc.fmt0(total), "kWh", "Ø " + Calc.fmt1(total / forecast.days.size) + " kWh pro Tag", Modifier.weight(1f).fillMaxHeight())
@@ -293,19 +311,27 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 if (rest != null) TodayCard(total = d0.kwh, rest = rest)
 
+                val chartF = full ?: forecast
+                val chartNow = if (full != null) nowFull else nowC
+                val pastHours = chartF.days.getOrNull(chartF.todayIndex)?.start ?: 0
+                val chartCount = pastHours + (if (range == 168) forecast.hours.size else range)
+
                 SectionCard(title = "Ertrag pro Tag (kWh)") {
                     val sd = selDay
                     Text(
-                        if (sd != null && sd < forecast.days.size) dayInfo(forecast.days[sd]) else "Tippe auf einen Balken für Details.\n ",
+                        if (sd != null && sd < chartF.days.size) dayInfo(chartF.days[sd]) else "Tippe auf einen Balken für Details.\n ",
                         fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp
                     )
-                    DailyChart(f = forecast, selected = sd, onSelect = { selDay = it })
+                    DailyChart(f = chartF, selected = sd, onSelect = { selDay = it })
                 }
 
                 SectionCard(
                     title = "Leistung pro Stunde (Watt)",
-                    bg = PanelOchre,
-                    borderColor = LineOchre,
+                    bg = CardPower,
+                    borderColor = CardPowerLine,
+                    inkColor = DarkInk,
+                    mutedColor = DarkMuted,
+                    darken = 0.25f,
                     trailing = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             FilterChip(selected = range == 24, onClick = { range = 24; selHour = null; selWx = null }, label = { Text("1 Tag") })
@@ -316,23 +342,30 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 ) {
                     val sh = selHour
                     Text(
-                        if (sh != null && sh < forecast.hours.size) hourInfo(forecast, sh) else "Tippe oder wische ins Diagramm für Details.\n ",
-                        fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp
+                        if (sh != null && sh < chartF.hours.size) hourInfo(chartF, sh) else "Mit 2 Tagen Rückblick. Tippe oder wische ins Diagramm für Details.\n ",
+                        fontSize = 12.5.sp, color = DarkMuted, lineHeight = 17.sp
                     )
                     HourlyChart(
-                        f = forecast,
-                        count = if (range == 168) forecast.hours.size else range,
-                        nowC = nowC,
+                        f = chartF,
+                        count = chartCount,
+                        nowC = chartNow,
                         selected = sh,
-                        onSelect = { selHour = it }
+                        onSelect = { selHour = it },
+                        ink = DarkInk,
+                        muted = DarkMuted,
+                        grid = Color(0x33000000),
+                        axis = Color(0x66000000),
+                        lineColor = Color(0xFF123A24)
                     )
                 }
 
-
                 SectionCard(
                     title = "Bewölkung und Temperatur",
-                    bg = PanelOrange,
-                    borderColor = LineOrange,
+                    bg = CardClouds,
+                    borderColor = CardCloudsLine,
+                    inkColor = DarkInk,
+                    mutedColor = DarkMuted,
+                    darken = 0.25f,
                     trailing = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             FilterChip(selected = range == 24, onClick = { range = 24; selHour = null; selWx = null }, label = { Text("1 Tag") })
@@ -343,36 +376,42 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 ) {
                     val sw = selWx
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Text("━ Temperatur (°C, links)", fontSize = 11.5.sp, color = TempColor)
-                        Text("▇ Bewölkung (%, rechts)", fontSize = 11.5.sp, color = CloudColor)
+                        Text("━ Temperatur (°C, links)", fontSize = 11.5.sp, color = TempColorDark)
+                        Text("▇ Bewölkung (%, rechts)", fontSize = 11.5.sp, color = CloudColorDark)
                     }
                     Text(
-                        if (sw != null && sw < forecast.hours.size) wxInfo(forecast, sw) else "Tippe oder wische ins Diagramm für Details.\n ",
-                        fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp
+                        if (sw != null && sw < chartF.hours.size) wxInfo(chartF, sw) else "Mit 2 Tagen Rückblick. Tippe oder wische ins Diagramm für Details.\n ",
+                        fontSize = 12.5.sp, color = DarkMuted, lineHeight = 17.sp
                     )
                     WeatherChart(
-                        f = forecast,
-                        count = if (range == 168) forecast.hours.size else range,
-                        nowC = nowC,
+                        f = chartF,
+                        count = chartCount,
+                        nowC = chartNow,
                         selected = sw,
-                        onSelect = { selWx = it }
+                        onSelect = { selWx = it },
+                        ink = DarkInk,
+                        muted = DarkMuted,
+                        grid = Color(0x33000000),
+                        axis = Color(0x66000000),
+                        tempColor = TempColorDark,
+                        cloudColor = CloudColorDark
                     )
                 }
 
                 vm.year?.let { y -> YearCard(plant, y) }
 
-                SectionCard(title = "Tabelle", bg = PanelAmber, borderColor = LineAmber) {
+                SectionCard(title = "Tabelle", bg = CardTable, borderColor = CardTableLine, inkColor = DarkInk, mutedColor = DarkMuted, darken = 0.25f) {
                     Row(Modifier.fillMaxWidth()) {
                         listOf("Tag" to 1.3f, "Ertrag" to 1f, "Spitze" to 1f, "Wolken" to 0.9f).forEach { (t, w) ->
-                            Text(t, fontSize = 11.sp, color = Muted, modifier = Modifier.weight(w))
+                            Text(t, fontSize = 11.sp, color = DarkMuted, modifier = Modifier.weight(w))
                         }
                     }
-                    forecast.days.forEachIndexed { k, d ->
+                    chartF.days.forEachIndexed { k, d ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                            Text((if (k == 0) "Heute" else Calc.weekday(d.date)) + " " + Calc.dm(d.date), fontSize = 13.sp, color = Ink, modifier = Modifier.weight(1.3f))
-                            Text(Calc.fmt1(d.kwh) + " kWh", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(1f))
-                            Text(Calc.fmt0(d.peak) + " W", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(1f))
-                            Text(d.cloudAvg?.let { Calc.fmt0(it) + " %" } ?: "–", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(0.9f))
+                            Text(dayName(k - chartF.todayIndex, d.date).let { if (k - chartF.todayIndex in -1..1 || k - chartF.todayIndex == -2) it else Calc.weekday(d.date) } + " " + Calc.dm(d.date), fontSize = 13.sp, color = DarkInk, fontWeight = if (k == chartF.todayIndex) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1.3f))
+                            Text(Calc.fmt1(d.kwh) + " kWh", fontSize = 13.sp, color = DarkInk, modifier = Modifier.weight(1f))
+                            Text(Calc.fmt0(d.peak) + " W", fontSize = 13.sp, color = DarkInk, modifier = Modifier.weight(1f))
+                            Text(d.cloudAvg?.let { Calc.fmt0(it) + " %" } ?: "–", fontSize = 13.sp, color = DarkInk, modifier = Modifier.weight(0.9f))
                         }
                     }
                 }

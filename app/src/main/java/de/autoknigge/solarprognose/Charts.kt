@@ -34,7 +34,16 @@ import java.util.Locale
 private val GridColor = Color(0xFF2B5848).copy(alpha = 0.55f)
 private val AxisColor = Color(0xFF2B5848)
 
-private class ChartPaints(sizeTick: Float, sizeDay: Float) {
+/** Tagesname relativ zu heute. */
+fun dayName(rel: Int, date: String): String = when (rel) {
+    -2 -> "Vorgestern"
+    -1 -> "Gestern"
+    0 -> "Heute"
+    1 -> "Morgen"
+    else -> Calc.weekday(date)
+}
+
+private class ChartPaints(sizeTick: Float, sizeDay: Float, ink: Color = Ink, muted: Color = Muted) {
     private fun paint(color: Color, size: Float, align: Paint.Align, bold: Boolean = false) = Paint().apply {
         isAntiAlias = true
         this.color = color.toArgb()
@@ -43,13 +52,13 @@ private class ChartPaints(sizeTick: Float, sizeDay: Float) {
         isFakeBoldText = bold
     }
 
-    val tickRight = paint(Muted, sizeTick, Paint.Align.RIGHT)
-    val tickCenter = paint(Muted, sizeTick, Paint.Align.CENTER)
-    val tickLeft = paint(Muted, sizeTick, Paint.Align.LEFT)
-    val day = paint(Ink, sizeDay, Paint.Align.CENTER)
-    val dayToday = paint(Ink, sizeDay, Paint.Align.CENTER, bold = true)
-    val now = paint(Muted, sizeTick, Paint.Align.CENTER)
-    val barLabel = paint(Ink, sizeDay, Paint.Align.CENTER, bold = true)
+    val tickRight = paint(muted, sizeTick, Paint.Align.RIGHT)
+    val tickCenter = paint(muted, sizeTick, Paint.Align.CENTER)
+    val tickLeft = paint(muted, sizeTick, Paint.Align.LEFT)
+    val day = paint(ink, sizeDay, Paint.Align.CENTER)
+    val dayToday = paint(ink, sizeDay, Paint.Align.CENTER, bold = true)
+    val now = paint(muted, sizeTick, Paint.Align.CENTER)
+    val barLabel = paint(ink, sizeDay, Paint.Align.CENTER, bold = true)
 }
 
 /** Stundenkurve der erwarteten Leistung. [count] = 48 (zwei Tage) oder alle Stunden (sieben Tage). */
@@ -60,10 +69,15 @@ fun HourlyChart(
     nowC: Double?,
     selected: Int?,
     onSelect: (Int?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    ink: Color = Ink,
+    muted: Color = Muted,
+    grid: Color = GridColor,
+    axis: Color = AxisColor,
+    lineColor: Color = Color(0xFFFFF3C4)
 ) {
     val density = LocalDensity.current
-    val paints = remember(density) { ChartPaints(with(density) { 11.sp.toPx() }, with(density) { 12.sp.toPx() }) }
+    val paints = remember(density, ink, muted) { ChartPaints(with(density) { 11.sp.toPx() }, with(density) { 12.sp.toPx() }, ink, muted) }
     val n = minOf(count, f.hours.size)
     val two = n <= 48
 
@@ -109,7 +123,7 @@ fun HourlyChart(
         var v = 0.0
         while (v <= top + 0.001) {
             drawLine(
-                color = if (v == 0.0) AxisColor else GridColor,
+                color = if (v == 0.0) axis else grid,
                 start = Offset(ml, yOf(v)),
                 end = Offset(w - mr, yOf(v)),
                 strokeWidth = 1.dp.toPx()
@@ -123,7 +137,7 @@ fun HourlyChart(
         f.days.filter { it.start < n }.forEachIndexed { k, d ->
             if (d.start > 0) {
                 drawLine(
-                    color = AxisColor,
+                    color = axis,
                     start = Offset(xOf(d.start.toDouble()), mt),
                     end = Offset(xOf(d.start.toDouble()), base),
                     strokeWidth = 1.dp.toPx(),
@@ -131,21 +145,17 @@ fun HourlyChart(
                 )
             }
             val cx = xOf((d.start + minOf(d.end, n)) / 2.0)
-            val dayPaint = if (k == 0) paints.dayToday else paints.day
+            val dayPaint = if (k == f.todayIndex) paints.dayToday else paints.day
             if (two) {
                 for (hh in intArrayOf(6, 12, 18)) {
                     if (d.start + hh < n) {
                         nativeCanvas.drawText(hh.toString(), xOf((d.start + hh).toDouble()), base + 15.dp.toPx(), paints.tickCenter)
                     }
                 }
-                val name = when (k) {
-                    0 -> "Heute"
-                    1 -> "Morgen"
-                    else -> Calc.weekday(d.date)
-                }
+                val name = dayName(k - f.todayIndex, d.date)
                 nativeCanvas.drawText(name + " · " + Calc.weekday(d.date) + " " + Calc.dm(d.date), cx, base + 36.dp.toPx(), dayPaint)
             } else {
-                nativeCanvas.drawText(if (k == 0) "Heute" else Calc.weekday(d.date), cx, base + 17.dp.toPx(), dayPaint)
+                nativeCanvas.drawText(if (k == f.todayIndex) "Heute" else Calc.weekday(d.date), cx, base + 17.dp.toPx(), dayPaint)
                 nativeCanvas.drawText(Calc.dm(d.date), cx, base + 31.dp.toPx(), paints.tickCenter)
             }
         }
@@ -175,13 +185,13 @@ fun HourlyChart(
                 endY = base
             )
         )
-        drawPath(line, color = Color(0xFFFFF3C4), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(line, color = lineColor, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 
         // Jetzt-Markierung
         if (nowC != null && nowC > 0 && nowC < n) {
             val x = xOf(nowC)
             drawLine(
-                color = Muted,
+                color = muted,
                 start = Offset(x, mt),
                 end = Offset(x, base),
                 strokeWidth = 1.5.dp.toPx(),
@@ -194,7 +204,7 @@ fun HourlyChart(
         if (selected != null && selected in 1 until n) {
             val x = xOf(selected - 0.5)
             val y = yOf(f.hours[selected].power)
-            drawLine(color = Ink.copy(alpha = 0.7f), start = Offset(x, mt), end = Offset(x, base), strokeWidth = 1.dp.toPx())
+            drawLine(color = ink.copy(alpha = 0.7f), start = Offset(x, mt), end = Offset(x, base), strokeWidth = 1.dp.toPx())
             drawCircle(color = Forest, radius = 7.dp.toPx(), center = Offset(x, y))
             drawCircle(color = GoldSoft, radius = 5.dp.toPx(), center = Offset(x, y))
         }
@@ -207,10 +217,12 @@ fun DailyChart(
     f: Forecast,
     selected: Int?,
     onSelect: (Int?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    ink: Color = Ink,
+    muted: Color = Muted
 ) {
     val density = LocalDensity.current
-    val paints = remember(density) { ChartPaints(with(density) { 11.sp.toPx() }, with(density) { 12.sp.toPx() }) }
+    val paints = remember(density, ink, muted) { ChartPaints(with(density) { 11.sp.toPx() }, with(density) { 12.sp.toPx() }, ink, muted) }
     val days = f.days
 
     fun dayAt(x: Float, width: Float, m: Float): Int {
@@ -261,14 +273,14 @@ fun DailyChart(
                         )
                     )
                 }
-                val barColor = if (k == 0) TodayOrange else {
+                val barColor = if (k == f.todayIndex) TodayOrange else {
                     val t = if (days.size <= 2) 1f else (k - 1).toFloat() / (days.size - 2)
                     androidx.compose.ui.graphics.lerp(GoldDark, GoldLight, t)
                 }
                 drawPath(path, color = if (selected == null || selected == k) barColor else barColor.copy(alpha = 0.55f))
             }
             nativeCanvas.drawText(Calc.fmt1(d.kwh), cx, minOf(y, base - 2.dp.toPx()) - 6.dp.toPx(), paints.barLabel)
-            nativeCanvas.drawText(if (k == 0) "Heute" else Calc.weekday(d.date), cx, base + 17.dp.toPx(), if (k == 0) paints.dayToday else paints.day)
+            nativeCanvas.drawText(if (k == f.todayIndex) "Heute" else Calc.weekday(d.date), cx, base + 17.dp.toPx(), if (k == f.todayIndex) paints.dayToday else paints.day)
             nativeCanvas.drawText(Calc.dm(d.date), cx, base + 31.dp.toPx(), paints.tickCenter)
         }
     }
@@ -480,10 +492,16 @@ fun WeatherChart(
     nowC: Double?,
     selected: Int?,
     onSelect: (Int?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    ink: Color = Ink,
+    muted: Color = Muted,
+    grid: Color = GridColor,
+    axis: Color = AxisColor,
+    tempColor: Color = TempColor,
+    cloudColor: Color = CloudColor
 ) {
     val density = LocalDensity.current
-    val paints = remember(density) { ChartPaints(with(density) { 11.sp.toPx() }, with(density) { 12.sp.toPx() }) }
+    val paints = remember(density, ink, muted) { ChartPaints(with(density) { 11.sp.toPx() }, with(density) { 12.sp.toPx() }, ink, muted) }
     val n = minOf(count, f.hours.size)
     val two = n <= 48
 
@@ -544,7 +562,7 @@ fun WeatherChart(
         var g = lo
         while (g <= hi + 0.001) {
             drawLine(
-                color = if (Math.abs(g) < 1e-9) AxisColor else GridColor,
+                color = if (Math.abs(g) < 1e-9) axis else grid,
                 start = Offset(ml, yT(g)),
                 end = Offset(w - mr, yT(g)),
                 strokeWidth = 1.dp.toPx()
@@ -561,7 +579,7 @@ fun WeatherChart(
         f.days.filter { it.start < n }.forEachIndexed { k, d ->
             if (d.start > 0) {
                 drawLine(
-                    color = AxisColor,
+                    color = axis,
                     start = Offset(xOf(d.start.toDouble()), mt),
                     end = Offset(xOf(d.start.toDouble()), base),
                     strokeWidth = 1.dp.toPx(),
@@ -569,21 +587,17 @@ fun WeatherChart(
                 )
             }
             val cx = xOf((d.start + minOf(d.end, n)) / 2.0)
-            val dayPaint = if (k == 0) paints.dayToday else paints.day
+            val dayPaint = if (k == f.todayIndex) paints.dayToday else paints.day
             if (two) {
                 for (hh in intArrayOf(6, 12, 18)) {
                     if (d.start + hh < n) {
                         nativeCanvas.drawText(hh.toString(), xOf((d.start + hh).toDouble()), base + 15.dp.toPx(), paints.tickCenter)
                     }
                 }
-                val name = when (k) {
-                    0 -> "Heute"
-                    1 -> "Morgen"
-                    else -> Calc.weekday(d.date)
-                }
+                val name = dayName(k - f.todayIndex, d.date)
                 nativeCanvas.drawText(name + " · " + Calc.weekday(d.date) + " " + Calc.dm(d.date), cx, base + 36.dp.toPx(), dayPaint)
             } else {
-                nativeCanvas.drawText(if (k == 0) "Heute" else Calc.weekday(d.date), cx, base + 17.dp.toPx(), dayPaint)
+                nativeCanvas.drawText(if (k == f.todayIndex) "Heute" else Calc.weekday(d.date), cx, base + 17.dp.toPx(), dayPaint)
                 nativeCanvas.drawText(Calc.dm(d.date), cx, base + 31.dp.toPx(), paints.tickCenter)
             }
         }
@@ -605,8 +619,8 @@ fun WeatherChart(
         }
         cArea.lineTo(xOf(n - 1 - 0.5), base)
         cArea.close()
-        drawPath(cArea, color = CloudColor.copy(alpha = 0.22f))
-        drawPath(cLine, color = CloudColor, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(cArea, color = cloudColor.copy(alpha = 0.22f))
+        drawPath(cLine, color = cloudColor, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 
         // Temperatur als Linie
         val tLine = Path()
@@ -615,13 +629,13 @@ fun WeatherChart(
             val y = yT(f.hours[i].temp)
             if (i == 1) tLine.moveTo(x, y) else tLine.lineTo(x, y)
         }
-        drawPath(tLine, color = TempColor, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(tLine, color = tempColor, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 
         // Jetzt-Markierung
         if (nowC != null && nowC > 0 && nowC < n) {
             val x = xOf(nowC)
             drawLine(
-                color = Muted,
+                color = muted,
                 start = Offset(x, mt),
                 end = Offset(x, base),
                 strokeWidth = 1.5.dp.toPx(),
@@ -633,11 +647,11 @@ fun WeatherChart(
         // Auswahl
         if (selected != null && selected in 1 until n) {
             val x = xOf(selected - 0.5)
-            drawLine(color = Ink.copy(alpha = 0.7f), start = Offset(x, mt), end = Offset(x, base), strokeWidth = 1.dp.toPx())
+            drawLine(color = ink.copy(alpha = 0.7f), start = Offset(x, mt), end = Offset(x, base), strokeWidth = 1.dp.toPx())
             drawCircle(color = Forest, radius = 6.dp.toPx(), center = Offset(x, yT(f.hours[selected].temp)))
-            drawCircle(color = TempColor, radius = 4.dp.toPx(), center = Offset(x, yT(f.hours[selected].temp)))
+            drawCircle(color = tempColor, radius = 4.dp.toPx(), center = Offset(x, yT(f.hours[selected].temp)))
             drawCircle(color = Forest, radius = 6.dp.toPx(), center = Offset(x, yC(f.hours[selected].cloud)))
-            drawCircle(color = CloudColor, radius = 4.dp.toPx(), center = Offset(x, yC(f.hours[selected].cloud)))
+            drawCircle(color = cloudColor, radius = 4.dp.toPx(), center = Offset(x, yC(f.hours[selected].cloud)))
         }
     }
 }

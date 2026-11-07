@@ -90,7 +90,8 @@ data class Day(
     val gustMax: Double = 0.0
 )
 
-data class Forecast(val timezone: String, val hours: List<Hour>, val days: List<Day>)
+/** [todayIndex]: Position von heute in [days]. Ohne Rückblick ist das 0, mit 2 Tagen Rückblick 2. */
+data class Forecast(val timezone: String, val hours: List<Hour>, val days: List<Day>, val todayIndex: Int = 0)
 
 /** Kurzfassung für Widget und Benachrichtigung. */
 data class Summary(

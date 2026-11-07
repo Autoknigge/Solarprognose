@@ -80,7 +80,7 @@ async function forecast(url, env, ctx) {
         "api",
         `latitude=${lat}&longitude=${lon}` +
           "&hourly=global_tilted_irradiance,temperature_2m,cloud_cover,precipitation,snowfall,weather_code,wind_gusts_10m" +
-          `&tilt=${tilt}&azimuth=${az}&forecast_days=7&timezone=auto`
+          `&tilt=${tilt}&azimuth=${az}&forecast_days=7&past_days=2&timezone=auto`
       )
     );
   });
