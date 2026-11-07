@@ -319,11 +319,12 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Tile("Bester Tag", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight())
                 }
 
-                if (rest != null) TodayCard(total = d0.kwh, rest = rest)
+                if (rest != null) TodayCard(total = d0.kwh, rest = rest, sun = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone))
 
                 val dayF = full ?: forecast
                 val hourF = if (range == -2) dayF else forecast
                 val hourNow = if (range == -2 && full != null) nowFull else nowC
+                val nowIdx = hourNow?.let { (Math.floor(it).toInt() + 1).coerceIn(0, (hourF.hours.size - 1).coerceAtLeast(0)) }
                 val hourCount = when (range) {
                     -2 -> hourF.days.getOrNull(hourF.todayIndex)?.end ?: 24
                     1 -> 24
@@ -349,7 +350,9 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     RangeChips(range) { range = it; selHour = null; selWx = null }
                     val sh = selHour
                     Text(
-                        if (sh != null && sh < hourF.hours.size) hourInfo(hourF, sh) else "Tippe oder wische ins Diagramm für Details.\n ",
+                        if (sh != null && sh < hourF.hours.size) hourInfo(hourF, sh)
+                        else if (nowIdx != null && hourF.hours.isNotEmpty()) "Jetzt · " + hourInfo(hourF, nowIdx)
+                        else "\n ",
                         fontSize = 12.5.sp, color = WarmMuted, lineHeight = 17.sp
                     )
                     HourlyChart(
@@ -364,6 +367,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         axis = Color(0x66FFFFFF),
                         lineColor = Color.Black
                     )
+                    Text("Tippe oder wische ins Diagramm für Details.", fontSize = 11.5.sp, color = WarmMuted)
                 }
 
                 SectionCard(
@@ -379,7 +383,9 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         Text("▇ Bewölkung (%, rechts)", fontSize = 11.5.sp, color = CloudColorLight)
                     }
                     Text(
-                        if (sw != null && sw < hourF.hours.size) wxInfo(hourF, sw) else "Tippe oder wische ins Diagramm für Details.\n ",
+                        if (sw != null && sw < hourF.hours.size) wxInfo(hourF, sw)
+                        else if (nowIdx != null && hourF.hours.isNotEmpty()) "Jetzt · " + wxInfo(hourF, nowIdx)
+                        else "\n ",
                         fontSize = 12.5.sp, color = WarmMuted, lineHeight = 17.sp
                     )
                     WeatherChart(
@@ -395,6 +401,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         tempColor = Color.Black,
                         cloudColor = CloudColorLight
                     )
+                    Text("Tippe oder wische ins Diagramm für Details.", fontSize = 11.5.sp, color = WarmMuted)
                 }
 
                 vm.year?.let { y -> YearCard(plant, y) }
@@ -455,7 +462,7 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
     var kwp by remember { mutableStateOf(existing?.kwp?.let { Calc.fmt1(it) } ?: "4,0") }
     var tilt by remember { mutableFloatStateOf((existing?.tilt ?: 35).toFloat()) }
     var az by remember { mutableFloatStateOf((existing?.az ?: 0).toFloat()) }
-    var eff by remember { mutableStateOf((existing?.eff ?: 85).toString()) }
+    var eff by remember { mutableStateOf((existing?.eff ?: 80).toString()) }
     var limit by remember { mutableStateOf(existing?.limitW?.takeIf { it > 0 }?.toString() ?: "") }
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<GeoPlace>>(emptyList()) }
@@ -558,7 +565,7 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
 
         SectionCard(title = "Verluste und Grenzen") {
             OutlinedTextField(
-                value = eff, onValueChange = { eff = it.filter { c -> c.isDigit() }.take(3) }, label = { Text("Systemwirkungsgrad (%)") }, singleLine = true,
+                value = eff, onValueChange = { eff = it.filter { c -> c.isDigit() }.take(3) }, label = { Text("Systemwirkungsgrad (%), üblich 75–90") }, singleLine = true,
                 supportingText = { Text("Wechselrichter, Kabel, Verschmutzung. Üblich sind 80 bis 90.") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
@@ -589,7 +596,7 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
                                 kwp = kw,
                                 tilt = tilt.roundToInt(),
                                 az = az.roundToInt(),
-                                eff = (eff.toIntOrNull() ?: 85).coerceIn(40, 100),
+                                eff = (eff.toIntOrNull() ?: 80).coerceIn(40, 100),
                                 limitW = limit.toIntOrNull()?.coerceAtLeast(0) ?: 0
                             )
                         )

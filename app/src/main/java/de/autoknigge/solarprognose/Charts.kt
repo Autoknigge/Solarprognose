@@ -275,7 +275,7 @@ fun DailyChart(
                 }
                 val ti = f.todayIndex
                 val barColor = when {
-                    k == ti -> TodayOrange
+                    k == ti -> TileToday
                     k < ti -> TileTomorrow
                     else -> {
                         val cnt = days.size - ti - 1

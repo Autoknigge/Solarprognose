@@ -34,7 +34,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     /** Langzeit-Monatserträge je kWp (PVGIS), falls geladen. */
-    var year by mutableStateOf<List<Double>?>(null)
+    var year by mutableStateOf<YearData?>(null)
         private set
 
     /** Börsenpreise ab heute, falls geladen. */

@@ -40,7 +40,7 @@ data class Plant(
             kwp = o.getDouble("kwp"),
             tilt = o.getInt("tilt"),
             az = o.getInt("az"),
-            eff = o.optInt("eff", 85),
+            eff = o.optInt("eff", 80),
             limitW = o.optInt("limitW", 0)
         )
     }

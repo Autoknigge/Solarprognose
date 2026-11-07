@@ -147,10 +147,10 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
 
 /** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest in einem Feld. */
 @Composable
-fun TodayCard(total: Double, rest: Double) {
+fun TodayCard(total: Double, rest: Double, sun: Pair<String, String>? = null) {
     val done = (total - rest).coerceAtLeast(0.0)
     val frac = if (total > 0.0) (done / total).toFloat().coerceIn(0f, 1f) else 0f
-    SectionCard(title = "Heute im Verlauf") {
+    SectionCard(title = "Heute im Verlauf", trailing = sun?.let { s -> { Text(s.first + " ⬆️  " + s.second + " ⬇️", fontSize = 13.sp, color = Ink) } }) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Stat("Prognose heute", Calc.fmt1(total), "kWh")
             Stat("bisher erzeugt", Calc.fmt1(done), "kWh", TodayOrange)
@@ -170,7 +170,8 @@ fun TodayCard(total: Double, rest: Double) {
 // ---------- Jahresprognose ----------
 
 @Composable
-fun YearCard(plant: Plant, perKwp: List<Double>) {
+fun YearCard(plant: Plant, data: YearData) {
+    val perKwp = data.perKwp
     var sel by remember { mutableStateOf<Int?>(null) }
     val months = perKwp.map { it * plant.kwp }
     val total = months.sum()
@@ -189,7 +190,7 @@ fun YearCard(plant: Plant, perKwp: List<Double>) {
         )
         MonthChart(values = months, currentMonth = today.monthValue - 1, selected = sel, onSelect = { sel = it })
         Text(
-            "Langzeitmittel aus vielen Jahren (PVGIS), kein Wert für ein einzelnes Jahr. Ohne Verschattung, Schnee und Wechselrichter-Grenze.",
+            data.label + ", kein Wert für ein einzelnes Jahr. Ohne Verschattung, Schnee und Wechselrichter-Grenze.",
             fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
         )
     }

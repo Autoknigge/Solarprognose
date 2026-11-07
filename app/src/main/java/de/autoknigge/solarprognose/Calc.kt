@@ -162,4 +162,27 @@ object Calc {
         }
         return Pair(st, Math.ceil(top / st) * st)
     }
+
+    /** Sonnenaufgang und -untergang (Ortszeit, "HH:mm") nach dem NOAA-Verfahren; null bei Polartag/-nacht. */
+    fun sunTimes(lat: Double, lon: Double, timezone: String): Pair<String, String>? {
+        val zone = try { ZoneId.of(timezone) } catch (e: Exception) { ZoneId.systemDefault() }
+        val date = LocalDate.now(zone)
+        val g = 2 * Math.PI / 365.0 * (date.dayOfYear - 1 + 0.5)
+        val eq = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) -
+            0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g))
+        val decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) -
+            0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) -
+            0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g)
+        val la = Math.toRadians(lat)
+        val cosH = Math.cos(Math.toRadians(90.833)) / (Math.cos(la) * Math.cos(decl)) - Math.tan(la) * Math.tan(decl)
+        if (cosH < -1.0 || cosH > 1.0) return null
+        val ha = Math.toDegrees(Math.acos(cosH))
+        val rise = 720 - 4 * (lon + ha) - eq
+        val set = 720 - 4 * (lon - ha) - eq
+        fun fmt(minUtc: Double): String {
+            val t = date.atStartOfDay(java.time.ZoneOffset.UTC).plusSeconds(Math.round(minUtc * 60)).withZoneSameInstant(zone)
+            return String.format(Locale.US, "%02d:%02d", t.hour, t.minute)
+        }
+        return fmt(rise) to fmt(set)
+    }
 }

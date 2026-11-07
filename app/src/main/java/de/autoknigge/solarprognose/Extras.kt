@@ -10,6 +10,9 @@ import java.time.ZoneId
 /** Börsenpreis einer Stunde in ct/kWh netto. [start] ist der Stundenanfang in Sekunden seit 1970. */
 data class PriceHour(val start: Long, val ct: Double)
 
+/** Monatswerte je kWp und Beschriftung der Datenbasis. */
+data class YearData(val perKwp: List<Double>, val label: String)
+
 enum class WeatherKind { Sun, SunCloud, Cloud, Rain, Snow, Hail, Thunder, Storm }
 
 /**
@@ -47,19 +50,45 @@ object Extras {
 
     // ---------- Jahreswerte ----------
 
-    private fun yearJson(p: Plant): String {
-        val loss = (100 - p.eff).coerceIn(0, 60)
-        return if (Api.hasProxy) {
-            Api.get(
-                "${Api.proxy}/yearly?latitude=${p.lat}&longitude=${p.lon}&tilt=${p.tilt}&azimuth=${p.az}&loss=$loss",
-                true
-            )
-        } else {
-            Api.get("$PVGIS?lat=${p.lat}&lon=${p.lon}&peakpower=1&loss=$loss&angle=${p.tilt}&aspect=${p.az}&outputformat=json", false)
+    private const val SERIES = "https://re.jrc.ec.europa.eu/api/v5_3/seriescalc"
+    private const val LABEL3 = "Mittel der drei Jahre 2021 bis 2023 (PVGIS)"
+    private const val LABEL_LT = "Langzeitmittel aus vielen Jahren (PVGIS)"
+
+    private fun lossOf(p: Plant) = (100 - p.eff).coerceIn(0, 60)
+
+    /** Stundenreihe 2021 bis 2023, daraus Monatssummen und deren Mittel. */
+    private fun fetchThreeYears(p: Plant): List<Double> {
+        val json = Api.get(
+            "$SERIES?lat=${p.lat}&lon=${p.lon}&peakpower=1&loss=${lossOf(p)}&angle=${p.tilt}&aspect=${p.az}" +
+                "&pvcalculation=1&startyear=2021&endyear=2023&outputformat=json", false
+        )
+        val arr = JSONObject(json).getJSONObject("outputs").getJSONArray("hourly")
+        val sums = HashMap<Int, DoubleArray>() // Jahr -> 12 Monatssummen in Wh
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val t = o.getString("time")
+            val y = t.substring(0, 4).toInt()
+            val m = t.substring(4, 6).toInt()
+            if (m !in 1..12) continue
+            sums.getOrPut(y) { DoubleArray(12) }[m - 1] += o.optDouble("P", 0.0)
         }
+        if (sums.size < 2) throw IllegalStateException("zu wenig Jahre")
+        val out = DoubleArray(12)
+        for (a in sums.values) for (m in 0 until 12) out[m] += a[m] / 1000.0 / sums.size
+        if (out.sum() <= 0.0) throw IllegalStateException("leer")
+        return out.toList()
     }
 
-    /** kWh je kWp und Monat, 12 Werte (Januar bis Dezember). */
+    private fun fetchLongTerm(p: Plant): List<Double> {
+        val json = if (Api.hasProxy) {
+            Api.get("${Api.proxy}/yearly?latitude=${p.lat}&longitude=${p.lon}&tilt=${p.tilt}&azimuth=${p.az}&loss=${lossOf(p)}", true)
+        } else {
+            Api.get("$PVGIS?lat=${p.lat}&lon=${p.lon}&peakpower=1&loss=${lossOf(p)}&angle=${p.tilt}&aspect=${p.az}&outputformat=json", false)
+        }
+        return parseYear(json)
+    }
+
+    /** kWh je kWp und Monat, 12 Werte (Januar bis Dezember), aus der PVcalc-Antwort. */
     fun parseYear(json: String): List<Double> {
         val arr = JSONObject(json).getJSONObject("outputs").getJSONObject("monthly").getJSONArray("fixed")
         val out = DoubleArray(12)
@@ -72,29 +101,34 @@ object Extras {
         return out.toList()
     }
 
-    fun cachedYear(ctx: Context, p: Plant): List<Double>? {
+    fun cachedYear(ctx: Context, p: Plant): YearData? {
         val sp = prefs(ctx)
-        if (sp.getString("ysig_${p.id}", null) != yearSig(p)) return null
+        if (sp.getString("ysig3_${p.id}", null) != yearSig(p)) return null
         return try {
-            parseYear(sp.getString("yjson_${p.id}", null) ?: return null)
+            val v = (sp.getString("ycsv3_${p.id}", null) ?: return null).split(",").map { it.toDouble() }
+            if (v.size != 12) null else YearData(v, sp.getString("ylab3_${p.id}", LABEL_LT) ?: LABEL_LT)
         } catch (e: Exception) {
             null
         }
     }
 
-    suspend fun loadYear(ctx: Context, p: Plant): List<Double> = withContext(Dispatchers.IO) {
+    suspend fun loadYear(ctx: Context, p: Plant): YearData = withContext(Dispatchers.IO) {
         val sp = prefs(ctx)
-        val fresh = System.currentTimeMillis() - sp.getLong("yts_${p.id}", 0L) < YEAR_TTL_MS
+        val fresh = System.currentTimeMillis() - sp.getLong("yts3_${p.id}", 0L) < YEAR_TTL_MS
         val hit = if (fresh) cachedYear(ctx, p) else null
         if (hit != null) return@withContext hit
-        val json = yearJson(p)
-        val v = parseYear(json)
+        val data = try {
+            YearData(fetchThreeYears(p), LABEL3)
+        } catch (e: Exception) {
+            YearData(fetchLongTerm(p), LABEL_LT)
+        }
         sp.edit()
-            .putString("yjson_${p.id}", json)
-            .putString("ysig_${p.id}", yearSig(p))
-            .putLong("yts_${p.id}", System.currentTimeMillis())
+            .putString("ycsv3_${p.id}", data.perKwp.joinToString(","))
+            .putString("ylab3_${p.id}", data.label)
+            .putString("ysig3_${p.id}", yearSig(p))
+            .putLong("yts3_${p.id}", System.currentTimeMillis())
             .apply()
-        v
+        data
     }
 
     // ---------- Börsenpreise ----------
