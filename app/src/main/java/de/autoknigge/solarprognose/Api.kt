@@ -20,7 +20,7 @@ object Api {
     internal fun get(url: String, sendToken: Boolean): String {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 15_000
-        c.readTimeout = 20_000
+        c.readTimeout = 45_000
         c.setRequestProperty("User-Agent", "Solarprognose-Android/" + BuildConfig.VERSION_NAME)
         if (sendToken && token.isNotBlank()) c.setRequestProperty("X-App-Token", token)
         try {

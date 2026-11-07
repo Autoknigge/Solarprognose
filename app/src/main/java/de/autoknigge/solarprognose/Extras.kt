@@ -51,16 +51,44 @@ object Extras {
     // ---------- Jahreswerte ----------
 
     private const val SERIES = "https://re.jrc.ec.europa.eu/api/v5_3/seriescalc"
-    private const val LABEL3 = "Mittel der drei Jahre 2021 bis 2023 (PVGIS)"
+    private const val LABEL3 = "Mittel der fünf Jahre 2019 bis 2023 (PVGIS)"
     private const val LABEL_LT = "Langzeitmittel aus vielen Jahren (PVGIS)"
 
     private fun lossOf(p: Plant) = (100 - p.eff).coerceIn(0, 60)
 
-    /** Stundenreihe 2021 bis 2023, daraus Monatssummen und deren Mittel. */
+    /** Letzte fünf volle Jahre aus dem Open-Meteo-Archiv, mit dem gleichen Leistungsmodell wie die Prognose. */
+    private fun fetchFiveYears(p: Plant): Pair<List<Double>, String> {
+        val end = LocalDate.now().year - 1
+        val start = end - 4
+        val json = Api.get(
+            "https://archive-api.open-meteo.com/v1/archive?latitude=${p.lat}&longitude=${p.lon}&tilt=${p.tilt}&azimuth=${p.az}" +
+                "&start_date=$start-01-01&end_date=$end-12-31&hourly=global_tilted_irradiance,temperature_2m&timezone=auto", false
+        )
+        val h = JSONObject(json).getJSONObject("hourly")
+        val time = h.getJSONArray("time")
+        val gti = h.getJSONArray("global_tilted_irradiance")
+        val tmp = h.getJSONArray("temperature_2m")
+        val sums = HashMap<Int, DoubleArray>()
+        for (i in 0 until time.length()) {
+            if (gti.isNull(i)) continue
+            val g = gti.getDouble(i).coerceAtLeast(0.0)
+            val t = if (tmp.isNull(i)) 10.0 else tmp.getDouble(i)
+            val w = g * (1.0 - 0.004 * (t + g * 0.031 - 25.0)) * (p.eff / 100.0) // Watt je kWp
+            val ts = time.getString(i) // 2024-05-17T13:00
+            sums.getOrPut(ts.substring(0, 4).toInt()) { DoubleArray(12) }[ts.substring(5, 7).toInt() - 1] += w.coerceAtLeast(0.0)
+        }
+        val full = sums.filterValues { it.sum() > 0.0 }
+        if (full.size < 3) throw IllegalStateException("zu wenig Jahre")
+        val out = DoubleArray(12)
+        for (a in full.values) for (m in 0 until 12) out[m] += a[m] / 1000.0 / full.size
+        return out.toList() to "Mittel der ${full.size} Jahre ${full.keys.min()} bis ${full.keys.max()} (Open-Meteo)"
+    }
+
+    /** Stundenreihe 2019 bis 2023 (neuere Jahre hat PVGIS nicht), daraus Monatssummen und deren Mittel. */
     private fun fetchThreeYears(p: Plant): List<Double> {
         val json = Api.get(
             "$SERIES?lat=${p.lat}&lon=${p.lon}&peakpower=1&loss=${lossOf(p)}&angle=${p.tilt}&aspect=${p.az}" +
-                "&pvcalculation=1&startyear=2021&endyear=2023&outputformat=json", false
+                "&pvcalculation=1&startyear=2019&endyear=2023&outputformat=json", false
         )
         val arr = JSONObject(json).getJSONObject("outputs").getJSONArray("hourly")
         val sums = HashMap<Int, DoubleArray>() // Jahr -> 12 Monatssummen in Wh
@@ -103,10 +131,10 @@ object Extras {
 
     fun cachedYear(ctx: Context, p: Plant): YearData? {
         val sp = prefs(ctx)
-        if (sp.getString("ysig3_${p.id}", null) != yearSig(p)) return null
+        if (sp.getString("ysig5_${p.id}", null) != yearSig(p)) return null
         return try {
-            val v = (sp.getString("ycsv3_${p.id}", null) ?: return null).split(",").map { it.toDouble() }
-            if (v.size != 12) null else YearData(v, sp.getString("ylab3_${p.id}", LABEL_LT) ?: LABEL_LT)
+            val v = (sp.getString("ycsv5_${p.id}", null) ?: return null).split(",").map { it.toDouble() }
+            if (v.size != 12) null else YearData(v, sp.getString("ylab5_${p.id}", LABEL_LT) ?: LABEL_LT)
         } catch (e: Exception) {
             null
         }
@@ -114,19 +142,23 @@ object Extras {
 
     suspend fun loadYear(ctx: Context, p: Plant): YearData = withContext(Dispatchers.IO) {
         val sp = prefs(ctx)
-        val fresh = System.currentTimeMillis() - sp.getLong("yts3_${p.id}", 0L) < YEAR_TTL_MS
+        val fresh = System.currentTimeMillis() - sp.getLong("yts5_${p.id}", 0L) < YEAR_TTL_MS
         val hit = if (fresh) cachedYear(ctx, p) else null
         if (hit != null) return@withContext hit
         val data = try {
-            YearData(fetchThreeYears(p), LABEL3)
+            fetchFiveYears(p).let { YearData(it.first, it.second) }
         } catch (e: Exception) {
-            YearData(fetchLongTerm(p), LABEL_LT)
+            try {
+                YearData(fetchThreeYears(p), LABEL3)
+            } catch (e2: Exception) {
+                YearData(fetchLongTerm(p), LABEL_LT)
+            }
         }
         sp.edit()
-            .putString("ycsv3_${p.id}", data.perKwp.joinToString(","))
-            .putString("ylab3_${p.id}", data.label)
-            .putString("ysig3_${p.id}", yearSig(p))
-            .putLong("yts3_${p.id}", System.currentTimeMillis())
+            .putString("ycsv5_${p.id}", data.perKwp.joinToString(","))
+            .putString("ylab5_${p.id}", data.label)
+            .putString("ysig5_${p.id}", yearSig(p))
+            .putLong("yts5_${p.id}", System.currentTimeMillis())
             .apply()
         data
     }
