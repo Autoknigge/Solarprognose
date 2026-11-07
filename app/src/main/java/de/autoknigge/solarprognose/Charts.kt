@@ -273,9 +273,15 @@ fun DailyChart(
                         )
                     )
                 }
-                val barColor = if (k == f.todayIndex) TodayOrange else {
-                    val t = if (days.size <= 2) 1f else (k - 1).toFloat() / (days.size - 2)
-                    androidx.compose.ui.graphics.lerp(GoldDark, GoldLight, t)
+                val ti = f.todayIndex
+                val barColor = when {
+                    k == ti -> TodayOrange
+                    k < ti -> TileTomorrow
+                    else -> {
+                        val cnt = days.size - ti - 1
+                        val t = if (cnt <= 1) 1f else (k - ti - 1).toFloat() / (cnt - 1)
+                        androidx.compose.ui.graphics.lerp(GoldDark, GoldLight, t)
+                    }
                 }
                 drawPath(path, color = if (selected == null || selected == k) barColor else barColor.copy(alpha = 0.55f))
             }

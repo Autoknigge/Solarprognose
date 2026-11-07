@@ -213,6 +213,16 @@ private fun dayInfo(d: Day): String =
     Calc.weekday(d.date) + " " + Calc.dm(d.date) + ": " + Calc.fmt1(d.kwh) + " kWh\n" +
         "Spitze " + Calc.fmt0(d.peak) + " W gegen " + d.peakHour + " Uhr · Wolken " + (d.cloudAvg?.let { Calc.fmt0(it) + " %" } ?: "–")
 
+/** Zeitraum der Stundendiagramme: -2 = zwei Tage zurück bis heute, sonst Tage ab heute. */
+@Composable
+private fun RangeChips(range: Int, onSelect: (Int) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(-2 to "-2 Tage", 1 to "1 Tag", 3 to "3 Tage", 7 to "7 Tage").forEach { (v, l) ->
+            FilterChip(selected = range == v, onClick = { onSelect(v) }, label = { Text(l) })
+        }
+    }
+}
+
 // ---------- Startseite ----------
 
 @Composable
@@ -221,7 +231,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
     val forecast = remember(vm.raw, plant) { vm.raw?.let { Calc.compute(it, plant) } }
     // Mit 2 Tagen Rückblick für Ertrag pro Tag, Leistung, Bewölkung/Temperatur und Tabelle
     val full = remember(vm.raw, plant) { vm.raw?.let { Calc.compute(it, plant, keepPast = true) } }
-    var range by rememberSaveable { mutableIntStateOf(48) }
+    var range by rememberSaveable { mutableIntStateOf(3) }
     var selHour by remember(plant.id) { mutableStateOf<Int?>(null) }
     var selDay by remember(plant.id) { mutableStateOf<Int?>(null) }
     var selWx by remember(plant.id) { mutableStateOf<Int?>(null) }
@@ -311,18 +321,23 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 if (rest != null) TodayCard(total = d0.kwh, rest = rest)
 
-                val chartF = full ?: forecast
-                val chartNow = if (full != null) nowFull else nowC
-                val pastHours = chartF.days.getOrNull(chartF.todayIndex)?.start ?: 0
-                val chartCount = pastHours + (if (range == 168) forecast.hours.size else range)
+                val dayF = full ?: forecast
+                val hourF = if (range == -2) dayF else forecast
+                val hourNow = if (range == -2 && full != null) nowFull else nowC
+                val hourCount = when (range) {
+                    -2 -> hourF.days.getOrNull(hourF.todayIndex)?.end ?: 24
+                    1 -> 24
+                    7 -> forecast.hours.size
+                    else -> 72
+                }
 
                 SectionCard(title = "Ertrag pro Tag (kWh)") {
                     val sd = selDay
                     Text(
-                        if (sd != null && sd < chartF.days.size) dayInfo(chartF.days[sd]) else "Tippe auf einen Balken für Details.\n ",
+                        if (sd != null && sd < dayF.days.size) dayInfo(dayF.days[sd]) else "Tippe auf einen Balken für Details.\n ",
                         fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp
                     )
-                    DailyChart(f = chartF, selected = sd, onSelect = { selDay = it })
+                    DailyChart(f = dayF, selected = sd, onSelect = { selDay = it })
                 }
 
                 SectionCard(
@@ -330,30 +345,24 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     bg = TileToday,
                     borderColor = Color(0xFFF08A70),
                                     mutedColor = WarmMuted,
-                    trailing = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FilterChip(selected = range == 24, onClick = { range = 24; selHour = null; selWx = null }, label = { Text("1 Tag") })
-                            FilterChip(selected = range == 48, onClick = { range = 48; selHour = null; selWx = null }, label = { Text("2 Tage") })
-                            FilterChip(selected = range == 168, onClick = { range = 168; selHour = null; selWx = null }, label = { Text("7 Tage") })
-                        }
-                    }
                 ) {
+                    RangeChips(range) { range = it; selHour = null; selWx = null }
                     val sh = selHour
                     Text(
-                        if (sh != null && sh < chartF.hours.size) hourInfo(chartF, sh) else "Mit 2 Tagen Rückblick. Tippe oder wische ins Diagramm für Details.\n ",
+                        if (sh != null && sh < hourF.hours.size) hourInfo(hourF, sh) else "Tippe oder wische ins Diagramm für Details.\n ",
                         fontSize = 12.5.sp, color = WarmMuted, lineHeight = 17.sp
                     )
                     HourlyChart(
-                        f = chartF,
-                        count = chartCount,
-                        nowC = chartNow,
+                        f = hourF,
+                        count = hourCount,
+                        nowC = hourNow,
                         selected = sh,
                         onSelect = { selHour = it },
                         ink = Ink,
                         muted = WarmMuted,
                         grid = Color(0x33FFFFFF),
                         axis = Color(0x66FFFFFF),
-                        lineColor = Color(0xFFFFF3C4)
+                        lineColor = Color.Black
                     )
                 }
 
@@ -362,34 +371,28 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     bg = TileTomorrow,
                     borderColor = Color(0xFFE8A060),
                                     mutedColor = WarmMuted,
-                    trailing = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FilterChip(selected = range == 24, onClick = { range = 24; selHour = null; selWx = null }, label = { Text("1 Tag") })
-                            FilterChip(selected = range == 48, onClick = { range = 48; selHour = null; selWx = null }, label = { Text("2 Tage") })
-                            FilterChip(selected = range == 168, onClick = { range = 168; selHour = null; selWx = null }, label = { Text("7 Tage") })
-                        }
-                    }
                 ) {
+                    RangeChips(range) { range = it; selHour = null; selWx = null }
                     val sw = selWx
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Text("━ Temperatur (°C, links)", fontSize = 11.5.sp, color = TempColor)
+                        Text("━ Temperatur (°C, links)", fontSize = 11.5.sp, color = Color.Black)
                         Text("▇ Bewölkung (%, rechts)", fontSize = 11.5.sp, color = CloudColorLight)
                     }
                     Text(
-                        if (sw != null && sw < chartF.hours.size) wxInfo(chartF, sw) else "Mit 2 Tagen Rückblick. Tippe oder wische ins Diagramm für Details.\n ",
+                        if (sw != null && sw < hourF.hours.size) wxInfo(hourF, sw) else "Tippe oder wische ins Diagramm für Details.\n ",
                         fontSize = 12.5.sp, color = WarmMuted, lineHeight = 17.sp
                     )
                     WeatherChart(
-                        f = chartF,
-                        count = chartCount,
-                        nowC = chartNow,
+                        f = hourF,
+                        count = hourCount,
+                        nowC = hourNow,
                         selected = sw,
                         onSelect = { selWx = it },
                         ink = Ink,
                         muted = WarmMuted,
                         grid = Color(0x33FFFFFF),
                         axis = Color(0x66FFFFFF),
-                        tempColor = TempColor,
+                        tempColor = Color.Black,
                         cloudColor = CloudColorLight
                     )
                 }
@@ -402,9 +405,9 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                             Text(t, fontSize = 11.sp, color = WarmMuted, modifier = Modifier.weight(w))
                         }
                     }
-                    chartF.days.forEachIndexed { k, d ->
+                    dayF.days.forEachIndexed { k, d ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                            Text(dayName(k - chartF.todayIndex, d.date).let { if (k - chartF.todayIndex in -1..1 || k - chartF.todayIndex == -2) it else Calc.weekday(d.date) } + " " + Calc.dm(d.date), fontSize = 13.sp, color = Ink, fontWeight = if (k == chartF.todayIndex) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1.3f))
+                            Text(dayName(k - dayF.todayIndex, d.date).let { if (k - dayF.todayIndex in -1..1 || k - dayF.todayIndex == -2) it else Calc.weekday(d.date) } + " " + Calc.dm(d.date), fontSize = 13.sp, color = Ink, fontWeight = if (k == dayF.todayIndex) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1.3f))
                             Text(Calc.fmt1(d.kwh) + " kWh", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(1f))
                             Text(Calc.fmt0(d.peak) + " W", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(1f))
                             Text(d.cloudAvg?.let { Calc.fmt0(it) + " %" } ?: "–", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(0.9f))
