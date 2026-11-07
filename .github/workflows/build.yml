@@ -39,7 +39,7 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             echo "VERSION_NAME=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
           else
-            echo "VERSION_NAME=1.0" >> "$GITHUB_ENV"
+            echo "VERSION_NAME=1.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
           fi
           echo "VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 

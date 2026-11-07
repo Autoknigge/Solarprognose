@@ -10,7 +10,7 @@ import java.time.ZoneId
 /** Börsenpreis einer Stunde in ct/kWh netto. [start] ist der Stundenanfang in Sekunden seit 1970. */
 data class PriceHour(val start: Long, val ct: Double)
 
-enum class WeatherKind { Sun, SunCloud, Cloud, Rain }
+enum class WeatherKind { Sun, SunCloud, Cloud, Rain, Snow, Hail, Thunder, Storm }
 
 /**
  * Zugaben zur Prognose:
@@ -30,9 +30,14 @@ object Extras {
 
     // ---------- Wettersymbol ----------
 
+    /** Tagessymbol. Reihenfolge: Hagel, Gewitter, Sturm (Böen ab 75 km/h), Schnee, Regen, sonst nach Bewölkung. */
     fun kindOf(d: Day): WeatherKind {
         val c = d.cloudAvg ?: 100.0
         return when {
+            d.hail -> WeatherKind.Hail
+            d.thunder -> WeatherKind.Thunder
+            d.gustMax >= 75.0 -> WeatherKind.Storm
+            d.snowCm >= 0.3 -> WeatherKind.Snow
             d.rainMm >= 1.0 -> WeatherKind.Rain
             c < 25.0 -> WeatherKind.Sun
             c < 60.0 -> WeatherKind.SunCloud

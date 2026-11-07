@@ -131,14 +131,21 @@ fun SolarRoot(activity: ComponentActivity) {
 // ---------- Bausteine ----------
 
 @Composable
-fun SectionCard(title: String, modifier: Modifier = Modifier, trailing: @Composable (() -> Unit)? = null, content: @Composable () -> Unit) {
+fun SectionCard(
+    title: String,
+    modifier: Modifier = Modifier,
+    trailing: @Composable (() -> Unit)? = null,
+    bg: androidx.compose.ui.graphics.Color = Panel,
+    borderColor: androidx.compose.ui.graphics.Color = Line,
+    content: @Composable () -> Unit
+) {
     val shape = RoundedCornerShape(14.dp)
     Column(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Panel)
-            .border(1.dp, Line, shape)
+            .background(bg)
+            .border(1.dp, borderColor, shape)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -297,10 +304,13 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 SectionCard(
                     title = "Leistung pro Stunde (Watt)",
+                    bg = PanelBlue,
+                    borderColor = LineBlue,
                     trailing = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FilterChip(selected = range == 48, onClick = { range = 48; selHour = null }, label = { Text("2 Tage") })
-                            FilterChip(selected = range != 48, onClick = { range = 168; selHour = null }, label = { Text("7 Tage") })
+                            FilterChip(selected = range == 24, onClick = { range = 24; selHour = null; selWx = null }, label = { Text("1 Tag") })
+                            FilterChip(selected = range == 48, onClick = { range = 48; selHour = null; selWx = null }, label = { Text("2 Tage") })
+                            FilterChip(selected = range == 168, onClick = { range = 168; selHour = null; selWx = null }, label = { Text("7 Tage") })
                         }
                     }
                 ) {
@@ -311,7 +321,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     )
                     HourlyChart(
                         f = forecast,
-                        count = if (range == 48) 48 else forecast.hours.size,
+                        count = if (range == 168) forecast.hours.size else range,
                         nowC = nowC,
                         selected = sh,
                         onSelect = { selHour = it }
@@ -321,10 +331,13 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 SectionCard(
                     title = "Bewölkung und Temperatur",
+                    bg = PanelViolet,
+                    borderColor = LineViolet,
                     trailing = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilterChip(selected = range == 24, onClick = { range = 24; selHour = null; selWx = null }, label = { Text("1 Tag") })
                             FilterChip(selected = range == 48, onClick = { range = 48; selHour = null; selWx = null }, label = { Text("2 Tage") })
-                            FilterChip(selected = range != 48, onClick = { range = 168; selHour = null; selWx = null }, label = { Text("7 Tage") })
+                            FilterChip(selected = range == 168, onClick = { range = 168; selHour = null; selWx = null }, label = { Text("7 Tage") })
                         }
                     }
                 ) {
@@ -339,7 +352,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     )
                     WeatherChart(
                         f = forecast,
-                        count = if (range == 48) 48 else forecast.hours.size,
+                        count = if (range == 168) forecast.hours.size else range,
                         nowC = nowC,
                         selected = sw,
                         onSelect = { selWx = it }
@@ -348,7 +361,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 vm.year?.let { y -> YearCard(plant, y) }
 
-                SectionCard(title = "Tabelle") {
+                SectionCard(title = "Tabelle", bg = PanelAmber, borderColor = LineAmber) {
                     Row(Modifier.fillMaxWidth()) {
                         listOf("Tag" to 1.3f, "Ertrag" to 1f, "Spitze" to 1f, "Wolken" to 0.9f).forEach { (t, w) ->
                             Text(t, fontSize = 11.sp, color = Muted, modifier = Modifier.weight(w))

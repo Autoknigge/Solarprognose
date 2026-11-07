@@ -36,7 +36,7 @@ object Api {
         if (proxy.isNotBlank()) return get("$proxy/forecast?$params", true)
         return get(
             "https://api.open-meteo.com/v1/forecast?$params" +
-                "&hourly=global_tilted_irradiance,temperature_2m,cloud_cover,precipitation&forecast_days=7&timezone=auto",
+                "&hourly=global_tilted_irradiance,temperature_2m,cloud_cover,precipitation,snowfall,weather_code,wind_gusts_10m&forecast_days=7&timezone=auto",
             false
         )
     }

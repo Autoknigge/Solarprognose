@@ -37,7 +37,7 @@ Ein Tag ohne „v“ erzeugt Version und Release, zum Beispiel:
 git tag 1.0 && git push origin 1.0
 ```
 
-`versionName` kommt aus dem Tag, `versionCode` aus der Build-Nummer des Workflows. Das Release enthält `Solarprognose.apk` (zum Testen) und `Solarprognose.aab` (für den Play Store).
+`versionName` kommt aus dem Tag, `versionCode` aus der Build-Nummer des Workflows. Bei normalen Builds auf `main` zählt der Name selbst mit: `1.0.<Build-Nummer>`, in der App klein neben dem Logo. Das Release enthält `Solarprognose.apk` (zum Testen) und `Solarprognose.aab` (für den Play Store).
 
 ## Wichtig: Wetterdaten
 

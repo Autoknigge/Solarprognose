@@ -24,7 +24,10 @@ object Calc {
             gti = arr("global_tilted_irradiance"),
             temp = arr("temperature_2m"),
             cloud = arr("cloud_cover"),
-            precip = if (h.has("precipitation")) arr("precipitation") else emptyList()
+            precip = if (h.has("precipitation")) arr("precipitation") else emptyList(),
+            snow = if (h.has("snowfall")) arr("snowfall") else emptyList(),
+            code = if (h.has("weather_code")) arr("weather_code") else emptyList(),
+            gust = if (h.has("wind_gusts_10m")) arr("wind_gusts_10m") else emptyList()
         )
     }
 
@@ -44,7 +47,10 @@ object Calc {
             if (p.limitW > 0) pw = minOf(pw, p.limitW.toDouble())
             pw = maxOf(0.0, pw)
             val rain = raw.precip.getOrNull(i)?.let { if (it.isNaN()) 0.0 else it } ?: 0.0
-            hours.add(Hour(t, t.substring(0, 10), t.substring(11, 13).toInt(), g, temp, cloud, pw, rain))
+            val snow = raw.snow.getOrNull(i)?.let { if (it.isNaN()) 0.0 else it } ?: 0.0
+            val code = raw.code.getOrNull(i)?.let { if (it.isNaN()) 0 else it.toInt() } ?: 0
+            val gust = raw.gust.getOrNull(i)?.let { if (it.isNaN()) 0.0 else it } ?: 0.0
+            hours.add(Hour(t, t.substring(0, 10), t.substring(11, 13).toInt(), g, temp, cloud, pw, rain, snow, code, gust))
         }
         val days = ArrayList<Day>()
         var i = 0
@@ -58,6 +64,10 @@ object Calc {
             var cn = 0
             var ts = 0.0
             var rain = 0.0
+            var snow = 0.0
+            var thunder = false
+            var hail = false
+            var gustMax = 0.0
             while (j < hours.size && hours[j].date == date) {
                 val h = hours[j]
                 kwh += h.power / 1000.0
@@ -69,11 +79,15 @@ object Calc {
                     cs += h.cloud
                     cn++
                     rain += h.precip
+                    snow += h.snowCm
+                    if (h.code == 95 || h.code == 96 || h.code == 99) thunder = true
+                    if (h.code == 96 || h.code == 99) hail = true
+                    if (h.gust > gustMax) gustMax = h.gust
                 }
                 ts += h.temp
                 j++
             }
-            days.add(Day(date, i, j, kwh, peak, peakH, if (cn > 0) cs / cn else null, ts / (j - i), rain))
+            days.add(Day(date, i, j, kwh, peak, peakH, if (cn > 0) cs / cn else null, ts / (j - i), rain, snow, thunder, hail, gustMax))
             i = j
         }
         return Forecast(raw.timezone, hours, days)

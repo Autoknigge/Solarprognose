@@ -23,6 +23,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
@@ -78,6 +80,53 @@ fun WeatherIcon(kind: WeatherKind, modifier: Modifier = Modifier) {
                 for (dx in floatArrayOf(0.30f, 0.50f, 0.70f)) {
                     drawLine(blue, Offset(dx * s, 0.66f * s), Offset((dx - 0.05f) * s, 0.86f * s), strokeWidth = s * 0.06f, cap = StrokeCap.Round)
                 }
+            }
+            WeatherKind.Snow -> {
+                cloud(0.1f * s, 0.06f * s, 0.8f * s, Color(0xFFB8C4CC))
+                for (dx in floatArrayOf(0.30f, 0.50f, 0.70f)) {
+                    val cx = dx * s
+                    val cy = (if (dx == 0.50f) 0.84f else 0.76f) * s
+                    val r = 0.055f * s
+                    for (k in 0 until 3) {
+                        val a = Math.toRadians(k * 60.0 + 90.0)
+                        val ex = (Math.cos(a) * r).toFloat()
+                        val ey = (Math.sin(a) * r).toFloat()
+                        drawLine(Color.White, Offset(cx - ex, cy - ey), Offset(cx + ex, cy + ey), strokeWidth = s * 0.03f, cap = StrokeCap.Round)
+                    }
+                }
+            }
+            WeatherKind.Hail -> {
+                cloud(0.1f * s, 0.06f * s, 0.8f * s, Color(0xFF9AA8B2))
+                for (p in listOf(0.30f to 0.76f, 0.50f to 0.86f, 0.70f to 0.76f)) {
+                    drawCircle(Color(0xFFE8F4FF), 0.045f * s, Offset(p.first * s, p.second * s))
+                }
+            }
+            WeatherKind.Thunder -> {
+                cloud(0.1f * s, 0.04f * s, 0.8f * s, Color(0xFF7D8A94))
+                val bolt = Path().apply {
+                    moveTo(0.54f * s, 0.50f * s)
+                    lineTo(0.38f * s, 0.74f * s)
+                    lineTo(0.49f * s, 0.74f * s)
+                    lineTo(0.42f * s, 0.96f * s)
+                    lineTo(0.64f * s, 0.67f * s)
+                    lineTo(0.52f * s, 0.67f * s)
+                    close()
+                }
+                drawPath(bolt, Color(0xFFFFD43B))
+            }
+            WeatherKind.Storm -> {
+                val wind = Color(0xFFCBD5DB)
+                val st = Stroke(width = s * 0.06f, cap = StrokeCap.Round)
+                fun gust(y: Float, x0: Float, x1: Float, curl: Float) {
+                    drawLine(wind, Offset(x0 * s, y * s), Offset(x1 * s, y * s), strokeWidth = s * 0.06f, cap = StrokeCap.Round)
+                    drawArc(
+                        color = wind, startAngle = -90f, sweepAngle = 270f, useCenter = false,
+                        topLeft = Offset((x1 - curl) * s, (y - 2 * curl) * s), size = Size(2 * curl * s, 2 * curl * s), style = st
+                    )
+                }
+                gust(0.34f, 0.08f, 0.62f, 0.10f)
+                gust(0.56f, 0.20f, 0.74f, 0.09f)
+                drawLine(wind, Offset(0.08f * s, 0.78f * s), Offset(0.50f * s, 0.78f * s), strokeWidth = s * 0.06f, cap = StrokeCap.Round)
             }
         }
     }
