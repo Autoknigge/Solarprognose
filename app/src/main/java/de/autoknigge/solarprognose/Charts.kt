@@ -175,7 +175,7 @@ fun HourlyChart(
                 endY = base
             )
         )
-        drawPath(line, color = Gold, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(line, color = Color(0xFFFFF3C4), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 
         // Jetzt-Markierung
         if (nowC != null && nowC > 0 && nowC < n) {

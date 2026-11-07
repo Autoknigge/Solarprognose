@@ -144,7 +144,7 @@ fun SectionCard(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(bg)
+            .background(cardBrush(bg))
             .border(1.dp, borderColor, shape)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -163,7 +163,7 @@ fun Tile(label: String, value: String, unit: String?, note: String, modifier: Mo
     Box(
         modifier
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(Panel2, Panel)))
+            .background(cardBrush(Panel2))
             .border(1.dp, Gold.copy(alpha = 0.55f), shape)
             .padding(12.dp)
     ) {
@@ -304,8 +304,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 SectionCard(
                     title = "Leistung pro Stunde (Watt)",
-                    bg = PanelBlue,
-                    borderColor = LineBlue,
+                    bg = PanelOchre,
+                    borderColor = LineOchre,
                     trailing = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             FilterChip(selected = range == 24, onClick = { range = 24; selHour = null; selWx = null }, label = { Text("1 Tag") })
@@ -331,8 +331,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 SectionCard(
                     title = "Bewölkung und Temperatur",
-                    bg = PanelViolet,
-                    borderColor = LineViolet,
+                    bg = PanelOrange,
+                    borderColor = LineOrange,
                     trailing = {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             FilterChip(selected = range == 24, onClick = { range = 24; selHour = null; selWx = null }, label = { Text("1 Tag") })
