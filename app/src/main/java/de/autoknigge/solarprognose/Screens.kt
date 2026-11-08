@@ -253,9 +253,9 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
             Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
                 Image(
                     painter = painterResource(R.drawable.logo_header),
-                    contentDescription = "Solarprognose",
+                    contentDescription = "Solarprognose – autoknigge.de öffnen",
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.height(59.dp).aspectRatio(1139f / 537f).clip(RoundedCornerShape(10.dp))
+                    modifier = Modifier.height(59.dp).aspectRatio(1139f / 537f).clip(RoundedCornerShape(10.dp)).clickable { uri.openUri(HOME_URL) }
                 )
                 Text(
                     BuildConfig.VERSION_NAME,
