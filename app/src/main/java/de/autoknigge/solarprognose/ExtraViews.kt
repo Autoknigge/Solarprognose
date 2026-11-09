@@ -147,10 +147,16 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
 
 /** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest in einem Feld. */
 @Composable
-fun TodayCard(total: Double, rest: Double, sun: Pair<String, String>? = null) {
+fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sun: Pair<String, String>? = null) {
     val done = (total - rest).coerceAtLeast(0.0)
     val frac = if (total > 0.0) (done / total).toFloat().coerceIn(0f, 1f) else 0f
     SectionCard(title = "Heute im Verlauf", trailing = sun?.let { s -> { Text(s.first + " ⬆️  " + s.second + " ⬇️", fontSize = 13.sp, color = Ink) } }) {
+        if (nowKw != null) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Stat("Jetzt (Leistung)", Calc.fmt2(nowKw), "kW", TileToday)
+                Text("≈ " + Calc.fmt0(nowKw * 1000.0) + " W", fontSize = 13.sp, color = Muted, modifier = Modifier.padding(top = 14.dp))
+            }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Stat("Prognose heute", Calc.fmt1(total), "kWh")
             Stat("bisher erzeugt", Calc.fmt1(done), "kWh", TodayOrange)
@@ -170,10 +176,10 @@ fun TodayCard(total: Double, rest: Double, sun: Pair<String, String>? = null) {
 // ---------- Jahresprognose ----------
 
 @Composable
-fun YearCard(plant: Plant, data: YearData) {
+fun YearCard(kwp: Double, data: YearData) {
     val perKwp = data.perKwp
     var sel by remember { mutableStateOf<Int?>(null) }
-    val months = perKwp.map { it * plant.kwp }
+    val months = perKwp.map { it * kwp }
     val total = months.sum()
     val names = arrayOf("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember")
     val today = LocalDate.now()

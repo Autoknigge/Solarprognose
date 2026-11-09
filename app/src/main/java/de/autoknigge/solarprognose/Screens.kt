@@ -228,9 +228,12 @@ private fun RangeChips(range: Int, onSelect: (Int) -> Unit) {
 @Composable
 fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSettings: () -> Unit) {
     val plant = vm.selected ?: return
-    val forecast = remember(vm.raw, plant) { vm.raw?.let { Calc.compute(it, plant) } }
+    val sel = vm.selectedPlants
+    val group = sel.size > 1
+    var showGroupDialog by remember { mutableStateOf(false) }
+    val forecast = remember(vm.raws, sel) { Calc.forecastFor(vm.raws, sel, false) }
     // Mit 2 Tagen Rückblick für Ertrag pro Tag, Leistung, Bewölkung/Temperatur und Tabelle
-    val full = remember(vm.raw, plant) { vm.raw?.let { Calc.compute(it, plant, keepPast = true) } }
+    val full = remember(vm.raws, sel) { Calc.forecastFor(vm.raws, sel, true) }
     var range by rememberSaveable { mutableIntStateOf(3) }
     var selHour by remember(plant.id) { mutableStateOf<Int?>(null) }
     var selDay by remember(plant.id) { mutableStateOf<Int?>(null) }
@@ -246,6 +249,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
     val nowFull = remember(full, tick) { full?.let { Calc.nowCoord(it) } }
     val nowSec = remember(tick) { System.currentTimeMillis() / 1000 }
     val uri = LocalUriHandler.current
+    if (showGroupDialog) GroupDialog(vm) { showGroupDialog = false }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -276,16 +280,23 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(vm.plants, key = { it.id }) { p ->
-                        FilterChip(selected = p.id == vm.selectedId, onClick = { vm.select(p.id) }, label = { Text(p.name) })
+                        PlantChip(p.name, p.id in vm.selectedIds) { vm.select(p.id) }
+                    }
+                    if (vm.plants.size >= 2) {
+                        item(key = "total") { PlantChip("Σ Gesamt", group) { showGroupDialog = true } }
                     }
                 }
-                IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Anlage bearbeiten", tint = Ink) }
-                IconButton(onClick = onAdd) { Icon(Icons.Filled.Add, contentDescription = "Anlage hinzufügen", tint = Ink) }
+                if (!group) IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Anlage bearbeiten", tint = Ink) }
+                if (vm.plants.size < MainViewModel.MAX_PLANTS) {
+                    IconButton(onClick = onAdd) { Icon(Icons.Filled.Add, contentDescription = "Anlage hinzufügen", tint = Ink) }
+                }
             }
 
             val stand = if (vm.fetchedAt > 0) " · Stand " + SimpleDateFormat("HH:mm", Locale.GERMANY).format(Date(vm.fetchedAt)) + " Uhr" else ""
             Text(
-                plant.place + " · " + Calc.fmt1(plant.kwp) + " kWp · " + plant.tilt + "° · " + Calc.azName(plant.az) + stand,
+                if (group) "Gesamt aus " + sel.size + " Anlagen · " + Calc.fmt1(sel.sumOf { it.kwp }) + " kWp" + stand
+                else plant.place + " · " + Calc.fmt1(plant.kwp) + " kWp · " + plant.tilt + "° · " + Calc.azName(plant.az) + stand
+                    + (if (plant.shades.isNotEmpty()) " · " + plant.shades.size + " Verschattung" + (if (plant.shades.size > 1) "en" else "") else ""),
                 fontSize = 13.sp, color = Muted
             )
 
@@ -319,7 +330,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Tile("Bester Tag", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight())
                 }
 
-                if (rest != null) TodayCard(total = d0.kwh, rest = rest, sun = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone))
+                val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0) }
+                if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, sun = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone))
 
                 val dayF = full ?: forecast
                 val hourF = if (range == -2) dayF else forecast
@@ -404,7 +416,12 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Text("Tippe oder wische ins Diagramm für Details.", fontSize = 11.5.sp, color = WarmMuted)
                 }
 
-                vm.year?.let { y -> YearCard(plant, y) }
+                val ys = sel.mapNotNull { p -> vm.years[p.id]?.let { p to it } }
+                if (ys.isNotEmpty()) {
+                    val kwpSum = ys.sumOf { it.first.kwp }
+                    val weighted = (0 until 12).map { m -> ys.sumOf { it.second.perKwp[m] * it.first.kwp } / kwpSum }
+                    YearCard(kwpSum, YearData(weighted, ys.first().second.label))
+                }
 
                 SectionCard(title = "Tabelle", bg = TileTomorrow, borderColor = Color(0xFFE8A060), mutedColor = WarmMuted) {
                     Row(Modifier.fillMaxWidth()) {
@@ -450,6 +467,48 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
     }
 }
 
+@Composable
+private fun PlantChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, Gold),
+        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+            selectedContainerColor = TileToday,
+            selectedLabelColor = Color.White
+        )
+    )
+}
+
+@Composable
+private fun GroupDialog(vm: MainViewModel, onDismiss: () -> Unit) {
+    var ids by remember { mutableStateOf(vm.selectedIds.toSet()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Gesamtleistung") },
+        text = {
+            Column {
+                Text("Welche Anlagen sollen zusammengezählt werden?", fontSize = 13.sp)
+                vm.plants.forEach { p ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { ids = if (p.id in ids) ids - p.id else ids + p.id },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.Checkbox(checked = p.id in ids, onCheckedChange = { ids = if (it) ids + p.id else ids - p.id })
+                        Text(p.name + " · " + Calc.fmt1(p.kwp) + " kWp", fontSize = 14.sp)
+                    }
+                }
+                TextButton(onClick = { ids = vm.plants.map { it.id }.toSet() }) { Text("Alle wählen") }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = ids.isNotEmpty(), onClick = { vm.setSelection(vm.plants.map { it.id }.filter { it in ids }); onDismiss() }) { Text("Anzeigen") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
+    )
+}
+
 // ---------- Anlage anlegen und bearbeiten ----------
 
 @Composable
@@ -464,6 +523,8 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
     var az by remember { mutableFloatStateOf((existing?.az ?: 0).toFloat()) }
     var eff by remember { mutableStateOf((existing?.eff ?: 80).toString()) }
     var limit by remember { mutableStateOf(existing?.limitW?.takeIf { it > 0 }?.toString() ?: "") }
+    var shades by remember { mutableStateOf(existing?.shades ?: emptyList()) }
+    var shadeEdit by remember { mutableStateOf<Pair<Int, Shade>?>(null) }
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<GeoPlace>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
@@ -491,6 +552,15 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
     val kwpVal = kwp.replace(',', '.').toDoubleOrNull()
     val valid = lat != null && lon != null && kwpVal != null && kwpVal > 0.0
     val welcome = existing == null && vm.plants.isEmpty()
+    shadeEdit?.let { (idx, sh) ->
+        ShadeDialog(
+            initial = sh,
+            isNew = idx < 0,
+            onSave = { n -> shades = if (idx < 0) shades + n else shades.mapIndexed { k, o -> if (k == idx) n else o }; shadeEdit = null },
+            onDelete = { shades = shades.filterIndexed { k, _ -> k != idx }; shadeEdit = null },
+            onDismiss = { shadeEdit = null }
+        )
+    }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -578,6 +648,23 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
             )
         }
 
+        SectionCard(title = "Verschattung (Zeitfenster)") {
+            Text(
+                "Für Zeiten, in denen Baum, Haus oder Schornstein die Module beschatten: Die Prognose wird in dem Zeitfenster um den eingestellten Prozentsatz gemindert, an den gewählten Wochentagen.",
+                color = Muted, fontSize = 12.5.sp
+            )
+            shades.forEachIndexed { i, sh ->
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Panel2).clickable { shadeEdit = i to sh }.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(shadeText(sh), color = Ink, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    Text("ändern", color = Gold, fontSize = 13.sp)
+                }
+            }
+            TextButton(onClick = { shadeEdit = -1 to Shade(Shade.ALL_DAYS, 8 * 60, 10 * 60, 20) }) { Text("+ Zeitfenster hinzufügen") }
+        }
+
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(
                 enabled = valid,
@@ -597,7 +684,8 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
                                 tilt = tilt.roundToInt(),
                                 az = az.roundToInt(),
                                 eff = (eff.toIntOrNull() ?: 80).coerceIn(40, 100),
-                                limitW = limit.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                                limitW = limit.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+                                shades = shades
                             )
                         )
                         onDone()
@@ -623,6 +711,64 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
             }
         }
     }
+}
+
+private val DAY_NAMES = arrayOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
+
+private fun minText(m: Int): String = if (m >= 1440) "24:00" else String.format(Locale.US, "%02d:%02d", m / 60, m % 60)
+
+private fun daysText(mask: Int): String = when (mask) {
+    Shade.ALL_DAYS -> "Täglich"
+    31 -> "Mo–Fr"
+    96 -> "Sa–So"
+    else -> DAY_NAMES.filterIndexed { i, _ -> (mask shr i) and 1 == 1 }.joinToString(", ")
+}
+
+private fun shadeText(s: Shade): String = daysText(s.days) + " " + minText(s.startMin) + "–" + minText(s.endMin) + " Uhr · −" + s.pct + " %"
+
+@Composable
+private fun ShadeDialog(initial: Shade, isNew: Boolean, onSave: (Shade) -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
+    var days by remember { mutableStateOf(initial.days) }
+    var start by remember { mutableFloatStateOf((initial.startMin / 15).toFloat()) }
+    var end by remember { mutableFloatStateOf((initial.endMin / 15).toFloat()) }
+    var pct by remember { mutableFloatStateOf(initial.pct.toFloat()) }
+    val s = start.roundToInt() * 15
+    val e = end.roundToInt() * 15
+    val ok = days != 0 && e > s
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (isNew) "Neues Zeitfenster" else "Zeitfenster ändern") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Wochentage", fontSize = 13.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    DAY_NAMES.forEachIndexed { i, n ->
+                        FilterChip(
+                            selected = (days shr i) and 1 == 1,
+                            onClick = { days = days xor (1 shl i) },
+                            label = { Text(n, fontSize = 11.sp, maxLines = 1) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                Row {
+                    TextButton(onClick = { days = Shade.ALL_DAYS }) { Text("Täglich", fontSize = 12.sp) }
+                    TextButton(onClick = { days = 31 }) { Text("Mo–Fr", fontSize = 12.sp) }
+                    TextButton(onClick = { days = 96 }) { Text("Sa–So", fontSize = 12.sp) }
+                }
+                Text("Von " + minText(s) + " Uhr", fontSize = 14.sp)
+                Slider(value = start, onValueChange = { start = it }, valueRange = 0f..95f, steps = 94)
+                Text("Bis " + minText(e) + " Uhr", fontSize = 14.sp)
+                Slider(value = end, onValueChange = { end = it }, valueRange = 1f..96f, steps = 94)
+                Text("Minderung: " + pct.roundToInt() + " %", fontSize = 14.sp)
+                Slider(value = pct, onValueChange = { pct = it }, valueRange = 5f..100f, steps = 18)
+                if (e <= s) Text("Das Ende muss nach dem Anfang liegen.", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                if (!isNew) TextButton(onClick = onDelete) { Text("Zeitfenster löschen", color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = { TextButton(enabled = ok, onClick = { onSave(Shade(days, s, e, pct.roundToInt())) }) { Text("Übernehmen") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
+    )
 }
 
 // ---------- Einstellungen ----------

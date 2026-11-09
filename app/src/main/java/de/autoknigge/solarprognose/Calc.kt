@@ -47,10 +47,11 @@ object Calc {
             val t = raw.time[i]
             if (!keepPast && t.substring(0, 10) < today) continue
             val g = raw.gti[i].let { if (it.isNaN()) 0.0 else it }
+            val shade = shadeFactor(p.shades, t.substring(0, 10), t.substring(11, 13).toInt())
             val temp = raw.temp[i].let { if (it.isNaN()) 10.0 else it }
             val cloud = raw.cloud[i].let { if (it.isNaN()) 0.0 else it }
-            val tcell = temp + g * 0.031
-            var pw = p.kwp * 1000.0 * (g / 1000.0) * (1.0 - 0.004 * (tcell - 25.0)) * (p.eff / 100.0)
+            val tcell = temp + g * shade * 0.031
+            var pw = p.kwp * 1000.0 * (g * shade / 1000.0) * (1.0 - 0.004 * (tcell - 25.0)) * (p.eff / 100.0)
             if (p.limitW > 0) pw = minOf(pw, p.limitW.toDouble())
             pw = maxOf(0.0, pw)
             val rain = raw.precip.getOrNull(i)?.let { if (it.isNaN()) 0.0 else it } ?: 0.0
@@ -59,6 +60,36 @@ object Calc {
             val gust = raw.gust.getOrNull(i)?.let { if (it.isNaN()) 0.0 else it } ?: 0.0
             hours.add(Hour(t, t.substring(0, 10), t.substring(11, 13).toInt(), g, temp, cloud, pw, rain, snow, code, gust))
         }
+        return assemble(raw.timezone, hours)
+    }
+
+    /** Faktor (0..1), um den die Einstrahlung in dieser Stunde durch Verschattungs-Zeitfenster bleibt. Die Stunde endet zur angegebenen Uhrzeit. */
+    fun shadeFactor(shades: List<Shade>, date: String, hour: Int): Double {
+        if (shades.isEmpty()) return 1.0
+        var d = LocalDate.parse(date)
+        var start = (hour - 1) * 60
+        if (hour == 0) {
+            d = d.minusDays(1)
+            start = 23 * 60
+        }
+        val wd = d.dayOfWeek.value - 1
+        var f = 1.0
+        for (s in shades) {
+            if ((s.days shr wd) and 1 == 0) continue
+            val overlap = (minOf(start + 60, s.endMin) - maxOf(start, s.startMin)).coerceAtLeast(0) / 60.0
+            f *= 1.0 - s.pct / 100.0 * overlap
+        }
+        return f
+    }
+
+    /** Fasst Stunden zu Tagen zusammen. */
+    fun assemble(timezone: String, hours: List<Hour>): Forecast {
+        val zone = try {
+            ZoneId.of(timezone)
+        } catch (e: Exception) {
+            ZoneId.systemDefault()
+        }
+        val today = LocalDate.now(zone).toString()
         val days = ArrayList<Day>()
         var i = 0
         while (i < hours.size) {
@@ -98,7 +129,23 @@ object Calc {
             i = j
         }
         val ti = days.indexOfFirst { it.date >= today }.let { if (it < 0) 0 else it }
-        return Forecast(raw.timezone, hours, days, ti)
+        return Forecast(timezone, hours, days, ti)
+    }
+
+
+    /** Prognose für mehrere Anlagen: die Leistungen gleicher Stunden werden addiert, Wetterwerte stammen von der ersten Anlage. */
+    fun combine(list: List<Forecast>): Forecast {
+        val base = list.first()
+        if (list.size == 1) return base
+        val others = list.drop(1).map { f -> f.hours.associate { it.time to it.power } }
+        val hours = base.hours.map { h -> h.copy(power = h.power + others.sumOf { it[h.time] ?: 0.0 }) }
+        return assemble(base.timezone, hours)
+    }
+
+    /** Prognose für die gewählten Anlagen (nur die mit geladenen Daten) oder null. */
+    fun forecastFor(raws: Map<String, Raw>, plants: List<Plant>, keepPast: Boolean): Forecast? {
+        val fs = plants.mapNotNull { p -> raws[p.id]?.let { compute(it, p, keepPast) } }.filter { it.hours.isNotEmpty() }
+        return if (fs.isEmpty()) null else combine(fs)
     }
 
     /** Aktuelle Position im Stundenraster (Index + Minutenanteil) oder null, wenn "jetzt" nicht im Datensatz liegt. */
@@ -148,6 +195,7 @@ object Calc {
     fun dm(date: String): String = date.substring(8, 10) + "." + date.substring(5, 7) + "."
 
     fun fmt1(v: Double): String = String.format(Locale.GERMANY, "%.1f", v)
+    fun fmt2(v: Double): String = String.format(Locale.GERMANY, "%.2f", v)
     fun fmt0(v: Double): String = String.format(Locale.GERMANY, "%,.0f", v)
 
     /** Schrittweite und Obergrenze für die Y-Achse. */

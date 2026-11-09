@@ -29,6 +29,13 @@ class Store(context: Context) {
             sp.edit().putString("selected", v).apply()
         }
 
+    /** Gewählte Anlagen für die Gesamtansicht (Kennungen, erste = Hauptanlage). */
+    var selectedIds: List<String>
+        get() = sp.getString("selected_ids", null)?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        set(v) {
+            sp.edit().putString("selected_ids", v.joinToString(",")).apply()
+        }
+
     var notifyOn: Boolean
         get() = sp.getBoolean("notify_on", false)
         set(v) {

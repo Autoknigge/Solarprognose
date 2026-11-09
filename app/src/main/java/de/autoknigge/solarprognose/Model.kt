@@ -1,6 +1,25 @@
 package de.autoknigge.solarprognose
 
+import org.json.JSONArray
 import org.json.JSONObject
+
+/**
+ * Verschattungs-Zeitfenster: an den Wochentagen in [days] (Bit 0 = Montag bis Bit 6 = Sonntag) wird die Einstrahlung
+ * zwischen [startMin] und [endMin] (Minuten seit 0 Uhr) um [pct] Prozent gemindert.
+ */
+data class Shade(val days: Int, val startMin: Int, val endMin: Int, val pct: Int) {
+    fun toJson(): JSONObject = JSONObject().put("days", days).put("start", startMin).put("end", endMin).put("pct", pct)
+
+    companion object {
+        const val ALL_DAYS = 127
+        fun fromJson(o: JSONObject) = Shade(
+            o.optInt("days", ALL_DAYS).and(ALL_DAYS),
+            o.getInt("start").coerceIn(0, 1439),
+            o.getInt("end").coerceIn(1, 1440),
+            o.getInt("pct").coerceIn(0, 100)
+        )
+    }
+}
 
 /** Eine PV-Anlage (Dachfläche) mit Standort und Anlagendaten. */
 data class Plant(
@@ -13,7 +32,8 @@ data class Plant(
     val tilt: Int,
     val az: Int,
     val eff: Int,
-    val limitW: Int
+    val limitW: Int,
+    val shades: List<Shade> = emptyList()
 ) {
     /** Alles, was die Einstrahlungsdaten beim Anbieter beeinflusst. */
     val geoSig: String get() = "$lat,$lon,$tilt,$az"
@@ -29,6 +49,7 @@ data class Plant(
         .put("az", az)
         .put("eff", eff)
         .put("limitW", limitW)
+        .put("shades", JSONArray().also { a -> shades.forEach { a.put(it.toJson()) } })
 
     companion object {
         fun fromJson(o: JSONObject) = Plant(
@@ -41,7 +62,10 @@ data class Plant(
             tilt = o.getInt("tilt"),
             az = o.getInt("az"),
             eff = o.optInt("eff", 80),
-            limitW = o.optInt("limitW", 0)
+            limitW = o.optInt("limitW", 0),
+            shades = o.optJSONArray("shades")?.let { a ->
+                (0 until a.length()).mapNotNull { i -> try { Shade.fromJson(a.getJSONObject(i)) } catch (e: Exception) { null } }
+            } ?: emptyList()
         )
     }
 }

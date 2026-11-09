@@ -2,6 +2,7 @@ package de.autoknigge.solarprognose
 
 import android.app.Application
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,14 +19,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var plants by mutableStateOf(store.plants())
         private set
 
-    var selectedId by mutableStateOf<String?>(null)
+    /** Angezeigte Anlagen. Mehrere ergeben die Gesamtansicht. */
+    var selectedIds by mutableStateOf<List<String>>(emptyList())
         private set
 
-    var raw by mutableStateOf<Raw?>(null)
+    var raws by mutableStateOf<Map<String, Raw>>(emptyMap())
         private set
 
-    var loading by mutableStateOf(false)
-        private set
+    private var running by mutableIntStateOf(0)
+
+    val loading: Boolean get() = running > 0
 
     var error by mutableStateOf<String?>(null)
         private set
@@ -33,8 +36,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var fetchedAt by mutableLongStateOf(0L)
         private set
 
-    /** Langzeit-Monatserträge je kWp (PVGIS), falls geladen. */
-    var year by mutableStateOf<YearData?>(null)
+    /** Jahreswerte je kWp (Open-Meteo-Archiv oder PVGIS) je Anlage, falls geladen. */
+    var years by mutableStateOf<Map<String, YearData>>(emptyMap())
         private set
 
     /** Börsenpreise ab heute, falls geladen. */
@@ -47,30 +50,41 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var notifyHour by mutableStateOf(store.notifyHour)
         private set
 
+    val selectedPlants: List<Plant>
+        get() = plants.filter { it.id in selectedIds }
+
+    /** Hauptanlage: die erste gewählte. */
     val selected: Plant?
-        get() = plants.firstOrNull { it.id == selectedId }
+        get() = selectedPlants.firstOrNull()
+
+    val selectedId: String?
+        get() = selected?.id
 
     init {
-        val saved = store.selectedId
-        selectedId = plants.firstOrNull { it.id == saved }?.id ?: plants.firstOrNull()?.id
-        selected?.let { showCached(it) }
+        val saved = store.selectedIds.filter { id -> plants.any { it.id == id } }
+        val first = saved.ifEmpty { listOfNotNull(plants.firstOrNull { it.id == store.selectedId }?.id ?: plants.firstOrNull()?.id) }
+        selectedIds = first
+        showCached()
         refresh()
     }
 
-    private fun showCached(p: Plant) {
-        raw = Repo.cached(ctx, p)
-        fetchedAt = if (raw != null) Repo.cachedTime(ctx, p) else 0L
-        year = Extras.cachedYear(ctx, p)
+    private fun showCached() {
+        val sel = selectedPlants
+        raws = sel.mapNotNull { p -> Repo.cached(ctx, p)?.let { p.id to it } }.toMap()
+        fetchedAt = sel.firstOrNull()?.let { if (raws.containsKey(it.id)) Repo.cachedTime(ctx, it) else 0L } ?: 0L
+        years = sel.mapNotNull { p -> Extras.cachedYear(ctx, p)?.let { p.id to it } }.toMap()
         prices = Extras.cachedPrices(ctx)
     }
 
     /** Jahreswerte und Börsenpreise sind Zugaben: Fehler dabei stören die Hauptansicht nicht. */
-    private fun refreshExtras(p: Plant) {
-        viewModelScope.launch {
-            try {
-                val y = Extras.loadYear(ctx, p)
-                if (selectedId == p.id) year = y
-            } catch (e: Exception) {
+    private fun refreshExtras() {
+        selectedPlants.forEach { p ->
+            viewModelScope.launch {
+                try {
+                    val y = Extras.loadYear(ctx, p)
+                    years = years + (p.id to y)
+                } catch (e: Exception) {
+                }
             }
         }
         viewModelScope.launch {
@@ -82,51 +96,68 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refresh() {
-        val p = selected ?: return
-        refreshExtras(p)
-        viewModelScope.launch {
-            loading = true
-            error = null
-            try {
-                val r = Repo.fetch(ctx, p)
-                if (selectedId == p.id) {
-                    raw = r
-                    fetchedAt = System.currentTimeMillis()
+        val sel = selectedPlants
+        if (sel.isEmpty()) return
+        refreshExtras()
+        error = null
+        sel.forEach { p ->
+            viewModelScope.launch {
+                running++
+                try {
+                    val r = Repo.fetch(ctx, p)
+                    raws = raws + (p.id to r)
+                    if (p.id == selectedId) fetchedAt = System.currentTimeMillis()
+                    Repo.saveSummary(ctx, p, r)
+                    SolarWidget.updateAll(ctx)
+                } catch (e: Exception) {
+                    error = "Die Prognose konnte nicht geladen werden (" + (e.message ?: "Netzwerkfehler") + ")."
+                } finally {
+                    running--
                 }
-                Repo.saveSummary(ctx, p, r)
-                SolarWidget.updateAll(ctx)
-            } catch (e: Exception) {
-                error = "Die Prognose konnte nicht geladen werden (" + (e.message ?: "Netzwerkfehler") + ")."
-            } finally {
-                loading = false
             }
         }
     }
 
-    fun select(id: String) {
-        selectedId = id
-        store.selectedId = id
-        selected?.let { showCached(it) }
+    /** Zeigt genau eine Anlage. */
+    fun select(id: String) = setSelection(listOf(id))
+
+    /** Zeigt mehrere Anlagen als Gesamtleistung. */
+    fun setSelection(ids: List<String>) {
+        val valid = plants.filter { it.id in ids }.map { it.id }
+        if (valid.isEmpty()) return
+        selectedIds = valid
+        store.selectedIds = valid
+        store.selectedId = valid.first()
+        showCached()
         refresh()
     }
 
     fun savePlant(p: Plant) {
-        plants = if (plants.any { it.id == p.id }) plants.map { if (it.id == p.id) p else it } else plants + p
+        val known = plants.any { it.id == p.id }
+        plants = if (known) plants.map { if (it.id == p.id) p else it } else {
+            if (plants.size >= MAX_PLANTS) return
+            plants + p
+        }
         store.savePlants(plants)
-        select(p.id)
+        if (known && p.id in selectedIds) setSelection(selectedIds) else select(p.id)
     }
 
     fun deletePlant(id: String) {
         plants = plants.filter { it.id != id }
         store.savePlants(plants)
         Repo.forget(ctx, id)
-        if (selectedId == id) {
-            val next = plants.firstOrNull()?.id
-            selectedId = next
-            store.selectedId = next
-            raw = null
-            year = null
-            if (next != null) select(next)
+        if (id in selectedIds) {
+            val rest = selectedIds.filter { it != id }
+            raws = raws - id
+            years = years - id
+            if (rest.isNotEmpty()) setSelection(rest)
+            else {
+                val next = plants.firstOrNull()?.id
+                selectedIds = emptyList()
+                store.selectedId = next
+                store.selectedIds = listOfNotNull(next)
+                if (next != null) select(next)
+            }
         }
     }
 
@@ -143,4 +174,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun search(query: String): List<GeoPlace> = withContext(Dispatchers.IO) { Api.geocode(query) }
+
+    companion object {
+        const val MAX_PLANTS = 10
+    }
 }
