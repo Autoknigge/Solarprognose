@@ -211,7 +211,8 @@ private fun wxInfo(f: Forecast, i: Int): String {
 
 private fun dayInfo(d: Day): String =
     Calc.weekday(d.date) + " " + Calc.dm(d.date) + ": " + Calc.fmt1(d.kwh) + " kWh\n" +
-        "Spitze " + Calc.fmt0(d.peak) + " W gegen " + d.peakHour + " Uhr · Wolken " + (d.cloudAvg?.let { Calc.fmt0(it) + " %" } ?: "–")
+        "Spitze " + Calc.fmt0(d.peak) + " W gegen " + d.peakHour + " Uhr · Wolken " + (d.cloudAvg?.let { Calc.fmt0(it) + " %" } ?: "–") +
+        (d.sunH?.let { " · Sonne " + Calc.fmt1(it) + " h" } ?: "")
 
 /** Zeitraum der Stundendiagramme: -2 = zwei Tage zurück bis heute, sonst Tage ab heute. */
 @Composable
@@ -248,6 +249,12 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
     val nowC = remember(forecast, tick) { forecast?.let { Calc.nowCoord(it) } }
     val nowFull = remember(full, tick) { full?.let { Calc.nowCoord(it) } }
     val nowSec = remember(tick) { System.currentTimeMillis() / 1000 }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30 * 60_000L)
+            vm.refresh()
+        }
+    }
     val uri = LocalUriHandler.current
     if (showGroupDialog) GroupDialog(vm) { showGroupDialog = false }
 
@@ -330,8 +337,12 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Tile("Bester Tag", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight())
                 }
 
+                val uvNow = nowC?.let { c ->
+                    val cur = forecast.hours.getOrNull(Math.floor(c).toInt() + 1)?.uv ?: 0.0
+                    if (cur > 0.0) cur else d0.uvMax
+                }?.takeIf { it > 0.0 }
                 val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0) }
-                if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, sun = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone))
+                if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, uv = uvNow, sun = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone))
 
                 val dayF = full ?: forecast
                 val hourF = if (range == -2) dayF else forecast
@@ -425,16 +436,17 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 SectionCard(title = "Tabelle", bg = TileTomorrow, borderColor = Color(0xFFE8A060), mutedColor = WarmMuted) {
                     Row(Modifier.fillMaxWidth()) {
-                        listOf("Tag" to 1.3f, "Ertrag" to 1f, "Spitze" to 1f, "Wolken" to 0.9f).forEach { (t, w) ->
+                        listOf("Tag" to 1.2f, "Ertrag" to 1f, "Spitze" to 0.95f, "Wolken" to 0.85f, "Sonne" to 0.75f).forEach { (t, w) ->
                             Text(t, fontSize = 11.sp, color = WarmMuted, modifier = Modifier.weight(w))
                         }
                     }
                     dayF.days.forEachIndexed { k, d ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                            Text(dayName(k - dayF.todayIndex, d.date).let { if (k - dayF.todayIndex in -1..1 || k - dayF.todayIndex == -2) it else Calc.weekday(d.date) } + " " + Calc.dm(d.date), fontSize = 13.sp, color = Ink, fontWeight = if (k == dayF.todayIndex) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1.3f))
+                            Text(dayName(k - dayF.todayIndex, d.date).let { if (k - dayF.todayIndex in -1..1 || k - dayF.todayIndex == -2) it else Calc.weekday(d.date) } + " " + Calc.dm(d.date), fontSize = 13.sp, color = Ink, fontWeight = if (k == dayF.todayIndex) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1.2f))
                             Text(Calc.fmt1(d.kwh) + " kWh", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(1f))
-                            Text(Calc.fmt0(d.peak) + " W", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(1f))
-                            Text(d.cloudAvg?.let { Calc.fmt0(it) + " %" } ?: "–", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(0.9f))
+                            Text(Calc.fmt0(d.peak) + " W", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(0.95f))
+                            Text(d.cloudAvg?.let { Calc.fmt0(it) + " %" } ?: "–", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(0.85f))
+                            Text(d.sunH?.let { Calc.fmt1(it) + " h" } ?: "–", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(0.75f))
                         }
                     }
                 }

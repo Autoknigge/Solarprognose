@@ -27,7 +27,9 @@ object Calc {
             precip = if (h.has("precipitation")) arr("precipitation") else emptyList(),
             snow = if (h.has("snowfall")) arr("snowfall") else emptyList(),
             code = if (h.has("weather_code")) arr("weather_code") else emptyList(),
-            gust = if (h.has("wind_gusts_10m")) arr("wind_gusts_10m") else emptyList()
+            gust = if (h.has("wind_gusts_10m")) arr("wind_gusts_10m") else emptyList(),
+            uv = if (h.has("uv_index")) arr("uv_index") else emptyList(),
+            sunSec = if (h.has("sunshine_duration")) arr("sunshine_duration") else emptyList()
         )
     }
 
@@ -58,7 +60,9 @@ object Calc {
             val snow = raw.snow.getOrNull(i)?.let { if (it.isNaN()) 0.0 else it } ?: 0.0
             val code = raw.code.getOrNull(i)?.let { if (it.isNaN()) 0 else it.toInt() } ?: 0
             val gust = raw.gust.getOrNull(i)?.let { if (it.isNaN()) 0.0 else it } ?: 0.0
-            hours.add(Hour(t, t.substring(0, 10), t.substring(11, 13).toInt(), g, temp, cloud, pw, rain, snow, code, gust))
+            val uv = raw.uv.getOrNull(i)?.let { if (it.isNaN()) 0.0 else it } ?: 0.0
+            val sun = raw.sunSec.getOrNull(i)?.let { if (it.isNaN()) -1.0 else it / 3600.0 } ?: -1.0
+            hours.add(Hour(t, t.substring(0, 10), t.substring(11, 13).toInt(), g, temp, cloud, pw, rain, snow, code, gust, uv, sun))
         }
         return assemble(raw.timezone, hours)
     }
@@ -106,6 +110,9 @@ object Calc {
             var thunder = false
             var hail = false
             var gustMax = 0.0
+            var sunSum = 0.0
+            var sunKnown = false
+            var uvMax = 0.0
             while (j < hours.size && hours[j].date == date) {
                 val h = hours[j]
                 kwh += h.power / 1000.0
@@ -123,9 +130,14 @@ object Calc {
                     if (h.gust > gustMax) gustMax = h.gust
                 }
                 ts += h.temp
+                if (h.sunH >= 0.0) {
+                    sunSum += h.sunH
+                    sunKnown = true
+                }
+                if (h.uv > uvMax) uvMax = h.uv
                 j++
             }
-            days.add(Day(date, i, j, kwh, peak, peakH, if (cn > 0) cs / cn else null, ts / (j - i), rain, snow, thunder, hail, gustMax))
+            days.add(Day(date, i, j, kwh, peak, peakH, if (cn > 0) cs / cn else null, ts / (j - i), rain, snow, thunder, hail, gustMax, if (sunKnown) sunSum else null, uvMax))
             i = j
         }
         val ti = days.indexOfFirst { it.date >= today }.let { if (it < 0) 0 else it }

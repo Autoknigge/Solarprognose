@@ -147,10 +147,20 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
 
 /** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest in einem Feld. */
 @Composable
-fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sun: Pair<String, String>? = null) {
+fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sun: Pair<String, String>? = null, uv: Double? = null) {
     val done = (total - rest).coerceAtLeast(0.0)
     val frac = if (total > 0.0) (done / total).toFloat().coerceIn(0f, 1f) else 0f
-    SectionCard(title = "Heute im Verlauf", trailing = sun?.let { s -> { Text(s.first + " ⬆️  " + s.second + " ⬇️", fontSize = 13.sp, color = Ink) } }) {
+    SectionCard(title = "Heute im Verlauf", trailing = sun?.let { s -> {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            if (uv != null) {
+                Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, modifier = Modifier.padding(end = 10.dp)) {
+                    Text("UV", fontSize = 10.sp, color = Muted, lineHeight = 11.sp)
+                    Text(Calc.fmt1(uv), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Ink, lineHeight = 14.sp)
+                }
+            }
+            Text(s.first + " ⬆️  " + s.second + " ⬇️", fontSize = 13.sp, color = Ink)
+        }
+    } }) {
         if (nowKw != null) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Stat("Jetzt (Leistung)", Calc.fmt2(nowKw), "kW", TileToday)

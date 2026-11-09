@@ -79,7 +79,7 @@ async function forecast(url, env, ctx) {
         env,
         "api",
         `latitude=${lat}&longitude=${lon}` +
-          "&hourly=global_tilted_irradiance,temperature_2m,cloud_cover,precipitation,snowfall,weather_code,wind_gusts_10m" +
+          "&hourly=global_tilted_irradiance,temperature_2m,cloud_cover,precipitation,snowfall,weather_code,wind_gusts_10m,uv_index,sunshine_duration" +
           `&tilt=${tilt}&azimuth=${az}&forecast_days=7&past_days=2&timezone=auto`
       )
     );
