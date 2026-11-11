@@ -161,8 +161,9 @@ data class GeoPlace(
     val admin2: String,
     val country: String,
     val lat: Double,
-    val lon: Double
+    val lon: Double,
+    val post: String = ""
 ) {
     val label: String
-        get() = listOf(name, admin2, admin1, country).filter { it.isNotBlank() }.distinct().joinToString(", ")
+        get() = (if (post.isNotBlank()) "$post " else "") + listOf(name, admin2, admin1, country).filter { it.isNotBlank() }.distinct().joinToString(", ")
 }

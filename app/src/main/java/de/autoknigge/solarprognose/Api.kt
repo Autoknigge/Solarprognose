@@ -57,7 +57,8 @@ object Api {
                 admin2 = r.optString("admin2"),
                 country = r.optString("country"),
                 lat = r.getDouble("latitude"),
-                lon = r.getDouble("longitude")
+                lon = r.getDouble("longitude"),
+                post = r.optJSONArray("postcodes")?.let { if (it.length() > 0) it.optString(0) else "" } ?: ""
             )
         }
     }

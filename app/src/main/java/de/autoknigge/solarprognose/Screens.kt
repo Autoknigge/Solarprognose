@@ -259,7 +259,13 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
     if (showGroupDialog) GroupDialog(vm) { showGroupDialog = false }
 
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (vm.loading) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.height(4.dp))
+
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             // Logo 3 mm höher als zuvor (40 dp + rund 19 dp), daneben klein die Versionsnummer
             Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
                 Image(
@@ -278,12 +284,6 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
             IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, contentDescription = "Aktualisieren", tint = Ink) }
             IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, contentDescription = "Einstellungen", tint = Ink) }
         }
-        if (vm.loading) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.height(4.dp))
-
-        Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(vm.plants, key = { it.id }) { p ->
@@ -543,7 +543,40 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
     var searching by remember { mutableStateOf(false) }
     var searchMsg by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var coords by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+
+    fun applyLoc(l: android.location.Location) {
+        lat = Math.round(l.latitude * 100000) / 100000.0
+        lon = Math.round(l.longitude * 100000) / 100000.0
+        place = "Mein Standort"
+        results = emptyList(); searchMsg = null
+    }
+
+    fun useLocation() {
+        try {
+            val lm = ctx.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+            val provs = lm.getProviders(true)
+            var best: android.location.Location? = null
+            for (p in provs) {
+                val l = try { lm.getLastKnownLocation(p) } catch (e: SecurityException) { null }
+                if (l != null && (best == null || l.accuracy < best.accuracy)) best = l
+            }
+            if (best != null) applyLoc(best)
+            else if (android.os.Build.VERSION.SDK_INT >= 30 && provs.isNotEmpty()) {
+                searchMsg = "Standort wird ermittelt …"
+                lm.getCurrentLocation(provs.first(), null, ctx.mainExecutor) { l ->
+                    if (l != null) applyLoc(l) else searchMsg = "Standort konnte nicht ermittelt werden. Ist die Ortung am Handy eingeschaltet?"
+                }
+            } else searchMsg = "Standort konnte nicht ermittelt werden. Ist die Ortung am Handy eingeschaltet?"
+        } catch (e: Exception) {
+            searchMsg = "Standort konnte nicht ermittelt werden."
+        }
+    }
+    val locLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) { r ->
+        if (r.values.any { it }) useLocation() else searchMsg = "Ohne Standortfreigabe geht es über die Suche oder die Koordinaten."
+    }
 
     fun doSearch() {
         val q = query.trim()
@@ -601,9 +634,17 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
                 if (lat != null) "Gewählt: $place" else "Noch kein Ort gewählt",
                 color = if (lat != null) Gold else Muted, fontSize = 14.sp
             )
+            if (lat != null && lon != null) {
+                Text("Breite " + String.format(Locale.US, "%.5f", lat) + "° · Länge " + String.format(Locale.US, "%.5f", lon) + "°", color = Ink, fontSize = 13.sp)
+            }
+            OutlinedButton(onClick = {
+                val fine = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                val coarse = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (fine || coarse) useLocation() else locLauncher.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+            }, modifier = Modifier.fillMaxWidth()) { Text("📍 Standort des Handys verwenden") }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
-                    value = query, onValueChange = { query = it }, label = { Text("Ort suchen") }, singleLine = true,
+                    value = query, onValueChange = { query = it }, label = { Text("Ort oder Postleitzahl suchen") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { doSearch() }),
                     modifier = Modifier.weight(1f)
@@ -613,6 +654,20 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
                 }
             }
             searchMsg?.let { Text(it, color = Muted, fontSize = 13.sp) }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = coords, onValueChange = { coords = it }, label = { Text("Koordinaten, z. B. 53.1235, 8.8017") }, singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Button(onClick = {
+                    val nums = Regex("-?\\d+(?:[.,]\\d+)?").findAll(coords).map { it.value.replace(',', '.').toDouble() }.toList()
+                    if (nums.size >= 2 && nums[0] in -90.0..90.0 && nums[1] in -180.0..180.0) {
+                        lat = nums[0]; lon = nums[1]
+                        place = "Koordinaten"
+                        coords = ""; searchMsg = null; results = emptyList()
+                    } else searchMsg = "Koordinaten nicht erkannt. Beispiel: 53.1235, 8.8017 (Breite, Länge)."
+                }, enabled = coords.isNotBlank()) { Text("OK") }
+            }
             results.forEach { r ->
                 Text(
                     r.label + "  (" + String.format(Locale.US, "%.2f, %.2f", r.lat, r.lon) + ")",
@@ -622,7 +677,7 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
                         .clip(RoundedCornerShape(10.dp))
                         .background(Panel2)
                         .clickable {
-                            place = r.name
+                            place = r.name + (if (r.post.isNotBlank()) " (" + r.post + ")" else "")
                             lat = r.lat
                             lon = r.lon
                             results = emptyList()
