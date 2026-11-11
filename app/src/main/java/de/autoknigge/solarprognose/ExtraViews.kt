@@ -262,9 +262,10 @@ fun PriceCard(prices: List<PriceHour>, nowSec: Long) {
 @Composable
 fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> Unit) {
     val colors = mapOf(
-        "Kohle" to Color(0xFFD4714F), "Erdgas" to Color(0xFFE0A03E), "Biomasse" to Color(0xFF9DBF5B),
-        "Wind" to Color(0xFF6FBFC4), "Wasserkraft" to Color(0xFF4B5A9E), "Solar" to Color(0xFF4C8BC4), "Sonstige" to Color(0xFFA0A0A0),
-        "Import" to Color(0xFFB07CD8), "Export" to Color(0xFFD86FA8)
+        "Kohle" to Color(0xFFD4714F), "Erdgas" to Color(0xFFA9896B), "Biomasse" to Color(0xFF9DBF5B),
+        "Wind" to Color(0xFF2E8B57), "Wasserkraft" to Color(0xFF4B5A9E), "Solar" to Color(0xFFE3B341), "Sonstige" to Color(0xFFA0A0A0),
+        "Import" to Color(0xFF5FD0E6), "Export" to Color(0xFFE8607A)
+    )
     )
     val zone = remember { ZoneId.of("Europe/Berlin") }
     var sel by remember(series) { mutableStateOf<Int?>(null) }
