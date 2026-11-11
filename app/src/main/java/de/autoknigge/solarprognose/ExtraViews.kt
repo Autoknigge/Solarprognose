@@ -304,7 +304,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
         }
         Text(head + " · Erzeugung " + Calc.fmt1(prod / 1000.0) + " GW", fontSize = 12.sp, color = LocalMuted.current)
         val top = MIX_GROUPS_UI.maxOf { avg(it) / prod * 100.0 }.coerceAtLeast(1.0)
-        fun bar(name: String, label: String) {
+        @Composable fun bar(name: String, label: String) {
             val pct = avg(name) / prod * 100.0
             val w = ((pct / top) * 0.78).toFloat().coerceIn(0.01f, 0.78f)
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
