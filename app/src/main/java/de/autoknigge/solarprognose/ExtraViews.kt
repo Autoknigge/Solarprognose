@@ -148,7 +148,7 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
 
 /** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest in einem Feld. */
 @Composable
-fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sun: Pair<String, String>? = null, uv: Double? = null) {
+fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sun: Pair<String, String>? = null, uv: Double? = null, sunTotal: Double? = null, sunRest: Double? = null) {
     val done = (total - rest).coerceAtLeast(0.0)
     val frac = if (total > 0.0) (done / total).toFloat().coerceIn(0f, 1f) else 0f
     SectionCard(title = "Heute im Verlauf", trailing = sun?.let { s -> {
@@ -172,6 +172,12 @@ fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sun: Pair<Stri
             Stat("Prognose heute", Calc.fmt1(total), "kWh")
             Stat("bisher erzeugt", Calc.fmt1(done), "kWh", TodayOrange)
             Stat("noch erwartet", Calc.fmt1(rest), "kWh", GoldSoft)
+        }
+        if (sunTotal != null) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Stat("Sonnenschein heute", Calc.fmt1(sunTotal), "h")
+                if (sunRest != null) Stat("noch erwartet", Calc.fmt1(sunRest), "h", GoldSoft)
+            }
         }
         Row(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)).background(Panel2)) {
             if (frac > 0.001f) Box(Modifier.weight(frac).fillMaxHeight().background(TodayOrange))

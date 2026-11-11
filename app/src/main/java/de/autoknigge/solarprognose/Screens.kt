@@ -342,7 +342,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     if (cur > 0.0) cur else d0.uvMax
                 }?.takeIf { it > 0.0 }
                 val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0) }
-                if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, uv = uvNow, sun = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone))
+                if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, uv = uvNow, sun = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone), sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
 
                 val dayF = full ?: forecast
                 val hourF = if (range == -2) dayF else forecast
