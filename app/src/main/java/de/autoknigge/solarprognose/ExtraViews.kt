@@ -266,7 +266,6 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
         "Wind" to Color(0xFF2E8B57), "Wasserkraft" to Color(0xFF4B5A9E), "Solar" to Color(0xFFE3B341), "Sonstige" to Color(0xFFA0A0A0),
         "Import" to Color(0xFF5FD0E6), "Export" to Color(0xFFE8607A)
     )
-    )
     val zone = remember { ZoneId.of("Europe/Berlin") }
     var sel by remember(series) { mutableStateOf<Int?>(null) }
     SectionCard(
