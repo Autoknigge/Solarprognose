@@ -278,14 +278,11 @@ fun MixCard(m: MixData) {
         m.shares.forEach { (name, pct) ->
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text(name, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
-                Box(Modifier.weight(0.66f)) {
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        Box(
-                            Modifier.fillMaxWidth(fraction = (pct / top).toFloat().coerceIn(0.01f, 1f) * 0.8f).height(22.dp)
-                                .background(colors[name] ?: Color.Gray)
-                        )
-                        Text(Calc.fmt1(pct) + " %", fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.padding(start = 6.dp))
-                    }
+                val w = ((pct / top) * 0.78).toFloat().coerceIn(0.01f, 0.78f)
+                Row(Modifier.weight(0.66f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Box(Modifier.weight(w).height(22.dp).background(colors[name] ?: Color.Gray))
+                    Text(Calc.fmt1(pct) + " %", fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.padding(start = 6.dp), maxLines = 1)
+                    Box(Modifier.weight((1f - w).coerceAtLeast(0.01f)))
                 }
             }
         }
