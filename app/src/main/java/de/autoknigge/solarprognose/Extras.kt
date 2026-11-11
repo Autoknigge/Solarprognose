@@ -6,12 +6,16 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 
 /** Börsenpreis einer Stunde in ct/kWh netto. [start] ist der Stundenanfang in Sekunden seit 1970. */
 data class PriceHour(val start: Long, val ct: Double)
 
 /** Monatswerte je kWp und Beschriftung der Datenbasis. */
 data class YearData(val perKwp: List<Double>, val label: String)
+
+/** Strommix: Anteile je Gruppe in Prozent (Summe 100), Stand als Uhrzeit, Tag als Datum. */
+data class MixData(val shares: List<Pair<String, Double>>, val upTo: String, val date: String)
 
 enum class WeatherKind { Sun, SunCloud, Cloud, Rain, Snow, Hail, Thunder, Storm }
 
@@ -209,5 +213,79 @@ object Extras {
         val v = parsePrices(json)
         sp.edit().putString("prices_json", json).putLong("prices_ts", System.currentTimeMillis()).apply()
         v
+    }
+
+    // ---------- Strommix (Energy-Charts, Fraunhofer ISE) ----------
+
+    private const val MIX_TTL_MS = 20L * 60 * 1000
+    val MIX_GROUPS = listOf("Kohle", "Erdgas", "Biomasse", "Wind", "Wasserkraft", "Solar", "Sonstige")
+
+    private fun mixGroup(name: String): String? {
+        val n = name.lowercase()
+        return when {
+            n.contains("load") || n.contains("share") || n.contains("cross") || n.contains("consumption") || n.contains("trading") -> null
+            n.contains("coal") && !n.contains("gas") -> "Kohle"
+            n.contains("lignite") -> "Kohle"
+            n == "fossil gas" -> "Erdgas"
+            n.contains("biomass") -> "Biomasse"
+            n.contains("wind") -> "Wind"
+            n.contains("hydro") && !n.contains("pumped") -> "Wasserkraft"
+            n == "solar" -> "Solar"
+            else -> "Sonstige"
+        }
+    }
+
+    /** Anteile der Nettostromerzeugung (nur positive Werte) über alle bisher vorhandenen Viertelstunden. */
+    fun parseMix(json: String): MixData? {
+        val o = JSONObject(json)
+        val t = o.getJSONArray("unix_seconds")
+        val types = o.getJSONArray("production_types")
+        val sums = HashMap<String, Double>()
+        var last = -1
+        for (k in 0 until types.length()) {
+            val ty = types.getJSONObject(k)
+            val g = mixGroup(ty.optString("name")) ?: continue
+            val d = ty.optJSONArray("data") ?: continue
+            for (i in 0 until minOf(d.length(), t.length())) {
+                if (d.isNull(i)) continue
+                val v = d.getDouble(i)
+                if (v > 0) {
+                    sums[g] = (sums[g] ?: 0.0) + v
+                    if (i > last) last = i
+                }
+            }
+        }
+        val total = sums.values.sum()
+        if (total <= 0.0 || last < 0) return null
+        val end = java.time.Instant.ofEpochSecond(t.getLong(last) + 900).atZone(berlin)
+        return MixData(
+            MIX_GROUPS.map { it to (sums[it] ?: 0.0) / total * 100.0 },
+            String.format(Locale.GERMANY, "%02d:%02d", end.hour, end.minute),
+            String.format(Locale.GERMANY, "%02d.%02d.%d", end.dayOfMonth, end.monthValue, end.year)
+        )
+    }
+
+    private fun encodeMix(m: MixData) = m.upTo + "|" + m.date + "|" + m.shares.joinToString(",") { it.second.toString() }
+
+    private fun decodeMix(s: String): MixData? = try {
+        val p = s.split("|")
+        val v = p[2].split(",").map { it.toDouble() }
+        if (v.size != MIX_GROUPS.size) null else MixData(MIX_GROUPS.zip(v), p[0], p[1])
+    } catch (e: Exception) {
+        null
+    }
+
+    fun cachedMix(ctx: Context): MixData? = prefs(ctx).getString("mix_v1", null)?.let { decodeMix(it) }
+
+    suspend fun loadMix(ctx: Context): MixData? = withContext(Dispatchers.IO) {
+        val sp = prefs(ctx)
+        if (System.currentTimeMillis() - sp.getLong("mix_ts", 0L) < MIX_TTL_MS) {
+            cachedMix(ctx)?.let { return@withContext it }
+        }
+        val today = LocalDate.now(berlin)
+        var m = parseMix(Api.get("https://api.energy-charts.info/public_power?country=de&start=$today&end=$today", false))
+        if (m == null) m = parseMix(Api.get("https://api.energy-charts.info/public_power?country=de&start=${today.minusDays(1)}&end=${today.minusDays(1)}", false))
+        if (m != null) sp.edit().putString("mix_v1", encodeMix(m)).putLong("mix_ts", System.currentTimeMillis()).apply()
+        m
     }
 }

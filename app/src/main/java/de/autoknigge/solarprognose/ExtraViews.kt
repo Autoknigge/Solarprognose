@@ -255,3 +255,40 @@ fun PriceCard(prices: List<PriceHour>, nowSec: Long) {
         )
     }
 }
+
+
+/** Strommix Deutschland (Energy-Charts): waagerechte Balken, schwarzer Hintergrund. */
+@Composable
+fun MixCard(m: MixData) {
+    val colors = mapOf(
+        "Kohle" to Color(0xFFD4714F), "Erdgas" to Color(0xFFE0A03E), "Biomasse" to Color(0xFF9DBF5B),
+        "Wind" to Color(0xFF6FBFC4), "Wasserkraft" to Color(0xFF4B5A9E), "Solar" to Color(0xFF4C8BC4), "Sonstige" to Color(0xFFA0A0A0)
+    )
+    val top = (m.shares.maxOfOrNull { it.second } ?: 1.0).coerceAtLeast(1.0)
+    val today = LocalDate.now(ZoneId.of("Europe/Berlin"))
+    val isToday = m.date == String.format(Locale.GERMANY, "%02d.%02d.%d", today.dayOfMonth, today.monthValue, today.year)
+    SectionCard(
+        title = "Strommix Deutschland",
+        bg = Color.Black, borderColor = Color(0xFF3A3A3A), inkColor = Color(0xFFEDEDED), mutedColor = Color(0xFF9A9A9A), darken = 0f
+    ) {
+        Text(
+            if (isToday) "Heute ${m.date} bis ${m.upTo} Uhr" else "Gestern ${m.date} (heute noch keine Daten)",
+            fontSize = 12.sp, color = LocalMuted.current
+        )
+        m.shares.forEach { (name, pct) ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(name, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
+                Box(Modifier.weight(0.66f)) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Box(
+                            Modifier.fillMaxWidth(fraction = (pct / top).toFloat().coerceIn(0.01f, 1f) * 0.8f).height(22.dp)
+                                .background(colors[name] ?: Color.Gray)
+                        )
+                        Text(Calc.fmt1(pct) + " %", fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.padding(start = 6.dp))
+                    }
+                }
+            }
+        }
+        Text("Nettostromerzeugung der öffentlichen Stromversorgung. Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
+    }
+}

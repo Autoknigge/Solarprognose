@@ -42,6 +42,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Börsenpreise ab heute, falls geladen. */
     var prices by mutableStateOf<List<PriceHour>?>(null)
+    var mix by mutableStateOf<MixData?>(null)
         private set
 
     var notifyOn by mutableStateOf(store.notifyOn)
@@ -74,6 +75,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         fetchedAt = sel.firstOrNull()?.let { if (raws.containsKey(it.id)) Repo.cachedTime(ctx, it) else 0L } ?: 0L
         years = sel.mapNotNull { p -> Extras.cachedYear(ctx, p)?.let { p.id to it } }.toMap()
         prices = Extras.cachedPrices(ctx)
+        mix = Extras.cachedMix(ctx)
     }
 
     /** Jahreswerte und Börsenpreise sind Zugaben: Fehler dabei stören die Hauptansicht nicht. */
@@ -90,6 +92,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 prices = Extras.loadPrices(ctx)
+            } catch (e: Exception) {
+            }
+        }
+        viewModelScope.launch {
+            try {
+                Extras.loadMix(ctx)?.let { mix = it }
             } catch (e: Exception) {
             }
         }
