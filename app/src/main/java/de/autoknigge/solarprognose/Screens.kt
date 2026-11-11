@@ -452,7 +452,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 }
 
                 vm.prices?.let { pr -> if (pr.isNotEmpty()) PriceCard(pr, nowSec) }
-                vm.mix?.let { MixCard(it) }
+                MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed) { vm.selectMix(it) }
             }
 
             Text(

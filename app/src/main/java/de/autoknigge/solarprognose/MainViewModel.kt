@@ -42,7 +42,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Börsenpreise ab heute, falls geladen. */
     var prices by mutableStateOf<List<PriceHour>?>(null)
-    var mix by mutableStateOf<MixData?>(null)
+    var mixRange by mutableStateOf(0)
+    var mixSeries by mutableStateOf<Map<Int, MixSeries>>(emptyMap())
+    var mixFailed by mutableStateOf<Set<Int>>(emptySet())
         private set
 
     var notifyOn by mutableStateOf(store.notifyOn)
@@ -75,7 +77,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         fetchedAt = sel.firstOrNull()?.let { if (raws.containsKey(it.id)) Repo.cachedTime(ctx, it) else 0L } ?: 0L
         years = sel.mapNotNull { p -> Extras.cachedYear(ctx, p)?.let { p.id to it } }.toMap()
         prices = Extras.cachedPrices(ctx)
-        mix = Extras.cachedMix(ctx)
     }
 
     /** Jahreswerte und Börsenpreise sind Zugaben: Fehler dabei stören die Hauptansicht nicht. */
@@ -95,10 +96,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
             }
         }
+        selectMix(mixRange)
+    }
+
+    fun selectMix(r: Int) {
+        mixRange = r
+        mixFailed = mixFailed - r
         viewModelScope.launch {
             try {
-                Extras.loadMix(ctx)?.let { mix = it }
+                val s = Extras.loadMixSeries(r)
+                if (s != null) mixSeries = mixSeries + (r to s) else mixFailed = mixFailed + r
             } catch (e: Exception) {
+                mixFailed = mixFailed + r
             }
         }
     }

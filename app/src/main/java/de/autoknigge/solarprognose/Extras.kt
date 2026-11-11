@@ -14,8 +14,8 @@ data class PriceHour(val start: Long, val ct: Double)
 /** Monatswerte je kWp und Beschriftung der Datenbasis. */
 data class YearData(val perKwp: List<Double>, val label: String)
 
-/** Strommix: Anteile je Gruppe in Prozent (Summe 100), Stand als Uhrzeit, Tag als Datum. */
-data class MixData(val shares: List<Pair<String, Double>>, val upTo: String, val date: String)
+/** Strommix-Zeitreihe: [t] Sekunden, [v] je Gruppe MW (Gruppen plus "Import" und "Export"). */
+class MixSeries(val t: LongArray, val v: Map<String, DoubleArray>, val hasTrade: Boolean)
 
 enum class WeatherKind { Sun, SunCloud, Cloud, Rain, Snow, Hail, Thunder, Storm }
 
@@ -217,13 +217,13 @@ object Extras {
 
     // ---------- Strommix (Energy-Charts, Fraunhofer ISE) ----------
 
-    private const val MIX_TTL_MS = 20L * 60 * 1000
     val MIX_GROUPS = listOf("Kohle", "Erdgas", "Biomasse", "Wind", "Wasserkraft", "Solar", "Sonstige")
+    private val mixCache = HashMap<Int, Pair<Long, MixSeries>>()
 
     private fun mixGroup(name: String): String? {
         val n = name.lowercase()
         return when {
-            n.contains("load") || n.contains("share") || n.contains("cross") || n.contains("consumption") || n.contains("trading") -> null
+            n.contains("load") || n.contains("share") || n.contains("consumption") -> null
             n.contains("coal") && !n.contains("gas") -> "Kohle"
             n.contains("lignite") -> "Kohle"
             n == "fossil gas" -> "Erdgas"
@@ -235,57 +235,107 @@ object Extras {
         }
     }
 
-    /** Anteile der Nettostromerzeugung (nur positive Werte) über alle bisher vorhandenen Viertelstunden. */
-    fun parseMix(json: String): MixData? {
+    /**
+     * Nettostromerzeugung je Gruppe (MW) plus Import/Export (MW, beides positiv). Auf höchstens [maxPoints] Zeitpunkte
+     * gemittelt. Schneidet hinten alles ab, wofür noch keine Erzeugungswerte vorliegen.
+     */
+    fun parseMixSeries(json: String, maxPoints: Int, cbet: Map<Long, Double>? = null): MixSeries? {
         val o = JSONObject(json)
         val t = o.getJSONArray("unix_seconds")
         val types = o.getJSONArray("production_types")
-        val sums = HashMap<String, Double>()
+        val n = t.length()
+        if (n == 0) return null
+        val keys = MIX_GROUPS + listOf("Import", "Export")
+        val raw = keys.associateWith { DoubleArray(n) }
         var last = -1
+        var haveTrade = false
         for (k in 0 until types.length()) {
             val ty = types.getJSONObject(k)
-            val g = mixGroup(ty.optString("name")) ?: continue
+            val name = ty.optString("name")
             val d = ty.optJSONArray("data") ?: continue
-            for (i in 0 until minOf(d.length(), t.length())) {
+            val lower = name.lowercase()
+            if (lower.contains("cross") && lower.contains("border")) {
+                haveTrade = true
+                for (i in 0 until minOf(n, d.length())) {
+                    if (d.isNull(i)) continue
+                    val v = d.getDouble(i)
+                    if (v > 0) raw["Import"]!![i] = v else raw["Export"]!![i] = -v
+                }
+                continue
+            }
+            val g = mixGroup(name) ?: continue
+            val a = raw[g]!!
+            for (i in 0 until minOf(n, d.length())) {
                 if (d.isNull(i)) continue
                 val v = d.getDouble(i)
                 if (v > 0) {
-                    sums[g] = (sums[g] ?: 0.0) + v
+                    a[i] += v
                     if (i > last) last = i
                 }
             }
         }
-        val total = sums.values.sum()
-        if (total <= 0.0 || last < 0) return null
-        val end = java.time.Instant.ofEpochSecond(t.getLong(last) + 900).atZone(berlin)
-        return MixData(
-            MIX_GROUPS.map { it to (sums[it] ?: 0.0) / total * 100.0 },
-            String.format(Locale.GERMANY, "%02d:%02d", end.hour, end.minute),
-            String.format(Locale.GERMANY, "%02d.%02d.%d", end.dayOfMonth, end.monthValue, end.year)
-        )
-    }
-
-    private fun encodeMix(m: MixData) = m.upTo + "|" + m.date + "|" + m.shares.joinToString(",") { it.second.toString() }
-
-    private fun decodeMix(s: String): MixData? = try {
-        val p = s.split("|")
-        val v = p[2].split(",").map { it.toDouble() }
-        if (v.size != MIX_GROUPS.size) null else MixData(MIX_GROUPS.zip(v), p[0], p[1])
-    } catch (e: Exception) {
-        null
-    }
-
-    fun cachedMix(ctx: Context): MixData? = prefs(ctx).getString("mix_v1", null)?.let { decodeMix(it) }
-
-    suspend fun loadMix(ctx: Context): MixData? = withContext(Dispatchers.IO) {
-        val sp = prefs(ctx)
-        if (System.currentTimeMillis() - sp.getLong("mix_ts", 0L) < MIX_TTL_MS) {
-            cachedMix(ctx)?.let { return@withContext it }
+        if (last < 0) return null
+        if (!haveTrade && cbet != null) {
+            for (i in 0..last) {
+                val v = cbet[t.getLong(i)] ?: continue
+                if (v > 0) raw["Import"]!![i] = v else raw["Export"]!![i] = -v
+            }
         }
+        val len = last + 1
+        val step = Math.ceil(len / maxPoints.toDouble()).toInt().coerceAtLeast(1)
+        val cnt = (len + step - 1) / step
+        val times = LongArray(cnt) { t.getLong(it * step) }
+        val out = keys.associateWith { key ->
+            val src = raw[key]!!
+            DoubleArray(cnt) { b ->
+                val from = b * step
+                val to = minOf(len, from + step)
+                var s = 0.0
+                for (i in from until to) s += src[i]
+                s / (to - from)
+            }
+        }
+        return MixSeries(times, out, haveTrade || cbet != null)
+    }
+
+    private fun cbetMap(json: String): Map<Long, Double> {
+        val o = JSONObject(json)
+        val t = o.getJSONArray("unix_seconds")
+        val cs = o.optJSONArray("countries") ?: return emptyMap()
+        val m = HashMap<Long, Double>()
+        for (k in 0 until cs.length()) {
+            val d = cs.getJSONObject(k).optJSONArray("data") ?: continue
+            for (i in 0 until minOf(t.length(), d.length())) {
+                if (d.isNull(i)) continue
+                m[t.getLong(i)] = (m[t.getLong(i)] ?: 0.0) + d.getDouble(i) * 1000.0
+            }
+        }
+        return m
+    }
+
+    /** range: 0 = Tag (heute, sonst gestern), 1 = Woche (7 Tage), 2 = Jahr (365 Tage). */
+    suspend fun loadMixSeries(range: Int): MixSeries? = withContext(Dispatchers.IO) {
+        val ttl = when (range) { 0 -> 20L * 60 * 1000; 1 -> 60L * 60 * 1000; else -> 6L * 3600 * 1000 }
+        synchronized(mixCache) { mixCache[range] }?.let { if (System.currentTimeMillis() - it.first < ttl) return@withContext it.second }
         val today = LocalDate.now(berlin)
-        var m = parseMix(Api.get("https://api.energy-charts.info/public_power?country=de&start=$today&end=$today", false))
-        if (m == null) m = parseMix(Api.get("https://api.energy-charts.info/public_power?country=de&start=${today.minusDays(1)}&end=${today.minusDays(1)}", false))
-        if (m != null) sp.edit().putString("mix_v1", encodeMix(m)).putLong("mix_ts", System.currentTimeMillis()).apply()
-        m
+        fun fetch(from: LocalDate, to: LocalDate, max: Int): MixSeries? {
+            val base = "https://api.energy-charts.info"
+            val pj = Api.get("$base/public_power?country=de&start=$from&end=$to", false)
+            var s = parseMixSeries(pj, max)
+            if (s != null && !s.hasTrade) {
+                try {
+                    s = parseMixSeries(pj, max, cbetMap(Api.get("$base/cbet?country=de&start=$from&end=$to", false)))
+                } catch (e: Exception) {
+                }
+            }
+            return s
+        }
+        var s = when (range) {
+            0 -> fetch(today, today, 96) ?: fetch(today.minusDays(1), today.minusDays(1), 96)
+            1 -> fetch(today.minusDays(6), today, 168)
+            else -> fetch(today.minusDays(364), today, 183)
+        }
+        if (s != null) synchronized(mixCache) { mixCache[range] = System.currentTimeMillis() to s }
+        s
     }
 }

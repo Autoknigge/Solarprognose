@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -257,28 +258,57 @@ fun PriceCard(prices: List<PriceHour>, nowSec: Long) {
 }
 
 
-/** Strommix Deutschland (Energy-Charts): waagerechte Balken, schwarzer Hintergrund. */
+/** Strommix Deutschland (Energy-Charts): Tag/Woche/Jahr, Schieber für einzelne Zeitpunkte, Import und Export. */
 @Composable
-fun MixCard(m: MixData) {
+fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> Unit) {
     val colors = mapOf(
         "Kohle" to Color(0xFFD4714F), "Erdgas" to Color(0xFFE0A03E), "Biomasse" to Color(0xFF9DBF5B),
-        "Wind" to Color(0xFF6FBFC4), "Wasserkraft" to Color(0xFF4B5A9E), "Solar" to Color(0xFF4C8BC4), "Sonstige" to Color(0xFFA0A0A0)
+        "Wind" to Color(0xFF6FBFC4), "Wasserkraft" to Color(0xFF4B5A9E), "Solar" to Color(0xFF4C8BC4), "Sonstige" to Color(0xFFA0A0A0),
+        "Import" to Color(0xFFB07CD8), "Export" to Color(0xFFD86FA8)
     )
-    val top = (m.shares.maxOfOrNull { it.second } ?: 1.0).coerceAtLeast(1.0)
-    val today = LocalDate.now(ZoneId.of("Europe/Berlin"))
-    val isToday = m.date == String.format(Locale.GERMANY, "%02d.%02d.%d", today.dayOfMonth, today.monthValue, today.year)
+    val zone = remember { ZoneId.of("Europe/Berlin") }
+    var sel by remember(series) { mutableStateOf<Int?>(null) }
     SectionCard(
         title = "Strommix Deutschland",
         bg = Color.Black, borderColor = Color(0xFF3A3A3A), inkColor = Color(0xFFEDEDED), mutedColor = Color(0xFF9A9A9A), darken = 0f
     ) {
-        Text(
-            if (isToday) "Heute ${m.date} bis ${m.upTo} Uhr" else "Gestern ${m.date} (heute noch keine Daten)",
-            fontSize = 12.sp, color = LocalMuted.current
-        )
-        m.shares.forEach { (name, pct) ->
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("Tag", "Woche", "Jahr").forEachIndexed { i, label ->
+                val on = i == range
+                Box(
+                    Modifier.clip(RoundedCornerShape(50)).background(if (on) Color(0xFFE3B341) else Color(0xFF262626))
+                        .clickable { onRange(i) }.padding(horizontal = 14.dp, vertical = 6.dp)
+                ) { Text(label, fontSize = 13.sp, color = if (on) Color.Black else Color(0xFFEDEDED), fontWeight = FontWeight.SemiBold) }
+            }
+        }
+        if (series == null) {
+            Text(if (failed) "Daten gerade nicht erreichbar." else "Lade Daten …", fontSize = 13.sp, color = LocalMuted.current)
+            return@SectionCard
+        }
+        val n = series.t.size
+        val s = sel
+        fun avg(g: String): Double = if (s != null) series.v[g]!![s.coerceIn(0, n - 1)] else series.v[g]!!.average()
+        val prod = MIX_GROUPS_UI.sumOf { avg(it) }.coerceAtLeast(1.0)
+        fun fmt(ts: Long, withTime: Boolean): String {
+            val z = Instant.ofEpochSecond(ts).atZone(zone)
+            val d = String.format(Locale.GERMANY, "%02d.%02d.%d", z.dayOfMonth, z.monthValue, z.year)
+            return if (withTime) d + String.format(Locale.GERMANY, " %02d:%02d Uhr", z.hour, z.minute) else d
+        }
+        val first = fmt(series.t[0], false)
+        val lastT = series.t[n - 1]
+        val head = if (s != null) {
+            fmt(series.t[s.coerceIn(0, n - 1)], range != 2)
+        } else when (range) {
+            0 -> "Heute bis " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(lastT + 900).atZone(zone).hour, Instant.ofEpochSecond(lastT + 900).atZone(zone).minute)
+            else -> "Durchschnitt $first bis ${fmt(lastT, false)}"
+        }
+        Text(head + " · Erzeugung " + Calc.fmt1(prod / 1000.0) + " GW", fontSize = 12.sp, color = LocalMuted.current)
+        val top = MIX_GROUPS_UI.maxOf { avg(it) / prod * 100.0 }.coerceAtLeast(1.0)
+        fun bar(name: String, label: String) {
+            val pct = avg(name) / prod * 100.0
+            val w = ((pct / top) * 0.78).toFloat().coerceIn(0.01f, 0.78f)
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text(name, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
-                val w = ((pct / top) * 0.78).toFloat().coerceIn(0.01f, 0.78f)
+                Text(label, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
                 Row(Modifier.weight(0.66f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     Box(Modifier.weight(w).height(22.dp).background(colors[name] ?: Color.Gray))
                     Text(Calc.fmt1(pct) + " %", fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.padding(start = 6.dp), maxLines = 1)
@@ -286,6 +316,34 @@ fun MixCard(m: MixData) {
                 }
             }
         }
-        Text("Nettostromerzeugung der öffentlichen Stromversorgung. Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
+        MIX_GROUPS_UI.forEach { bar(it, it) }
+        if (series.hasTrade) {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
+            bar("Import", "Import")
+            bar("Export", "Export")
+            val net = (avg("Import") - avg("Export")) / 1000.0
+            Text(
+                (if (net >= 0) "Netto-Import " else "Netto-Export ") + Calc.fmt1(Math.abs(net)) + " GW",
+                fontSize = 12.sp, color = LocalMuted.current
+            )
+        }
+        if (n > 1) {
+            androidx.compose.material3.Slider(
+                value = (s ?: (n - 1)).toFloat(),
+                onValueChange = { sel = it.toInt().coerceIn(0, n - 1) },
+                valueRange = 0f..(n - 1).toFloat(),
+                colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Color(0xFFE3B341), activeTrackColor = Color(0xFFE3B341), inactiveTrackColor = Color(0xFF3A3A3A))
+            )
+            Row(Modifier.fillMaxWidth()) {
+                Text(
+                    if (s == null) "Schieber: einzelnen Zeitpunkt wählen" else "Zurück zur Gesamtansicht",
+                    fontSize = 12.sp, color = if (s == null) LocalMuted.current else Color(0xFFE3B341),
+                    modifier = if (s == null) Modifier else Modifier.clickable { sel = null }
+                )
+            }
+        }
+        Text("Nettostromerzeugung der öffentlichen Stromversorgung, Anteile an der Erzeugung. Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
     }
 }
+
+private val MIX_GROUPS_UI = Extras.MIX_GROUPS
