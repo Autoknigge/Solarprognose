@@ -327,6 +327,14 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val best = forecast.days.maxByOrNull { it.kwh } ?: d0
                 val rest = nowC?.let { Calc.remainingToday(forecast, it) }
 
+                val curH = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1) }
+                if (curH != null) {
+                    Tile(
+                        "Jetzt", Calc.fmt1(curH.temp), "°C",
+                        Extras.codeText(curH) + " · Wolken " + Calc.fmt0(curH.cloud) + " %" + (if (curH.gust >= 20.0) " · Böen " + Calc.fmt0(curH.gust) + " km/h" else ""),
+                        Modifier.fillMaxWidth(), icon = Extras.kindOfHour(curH), bg = Panel2
+                    )
+                }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile("Heute", Calc.fmt1(d0.kwh), "kWh", if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
                         Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(d0), bg = TileToday, mutedColor = Color(0xFFFFE6DA))
@@ -428,6 +436,20 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Text("Tippe oder wische ins Diagramm für Details.", fontSize = 11.5.sp, color = WarmMuted)
                 }
 
+                val shown = (forecast.todayIndex + 1 until forecast.days.size).toList()
+                if (shown.isNotEmpty()) {
+                    val maxP = forecast.hours.maxOfOrNull { it.power } ?: 0.0
+                    val (stepW, topW) = Calc.niceScale(maxP, doubleArrayOf(100.0, 200.0, 250.0, 500.0, 1000.0, 2000.0, 2500.0), 3)
+                    val temps = shown.flatMap { k -> forecast.hours.subList(forecast.days[k].start, minOf(forecast.days[k].end, forecast.hours.size)).map { it.temp } }
+                    val tMin = Math.floor(temps.minOrNull() ?: 0.0)
+                    val tMax = Math.ceil(temps.maxOrNull() ?: 10.0)
+                    Text("Die nächsten Tage", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Gold)
+                    shown.forEachIndexed { i, k ->
+                        val frac = if (shown.size > 1) i / (shown.size - 1f) else 0f
+                        DayCard(forecast, k, topW, stepW, tMin, tMax, androidx.compose.ui.graphics.lerp(TileTomorrow, Color(0xFFF5C77E), frac))
+                    }
+                }
+
                 val ys = sel.mapNotNull { p -> vm.years[p.id]?.let { p to it } }
                 if (ys.isNotEmpty()) {
                     val kwpSum = ys.sumOf { it.first.kwp }
@@ -453,6 +475,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 }
 
                 vm.prices?.let { pr -> if (pr.isNotEmpty()) PriceCard(pr, nowSec) }
+                vm.mixSeries[0]?.let { GridNowCard(it) }
                 MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed) { vm.selectMix(it) }
             }
 

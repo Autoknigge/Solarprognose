@@ -96,11 +96,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
             }
         }
-        selectMix(mixRange)
+        loadMixRange(0)
+        if (mixRange != 0) loadMixRange(mixRange)
     }
 
     fun selectMix(r: Int) {
         mixRange = r
+        loadMixRange(r)
+    }
+
+    private fun loadMixRange(r: Int) {
         mixFailed = mixFailed - r
         viewModelScope.launch {
             try {

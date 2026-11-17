@@ -1,6 +1,10 @@
 package de.autoknigge.solarprognose
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -353,3 +357,159 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
 }
 
 private val MIX_GROUPS_UI = Extras.MIX_GROUPS
+
+/** Anteil von Solar und Erneuerbaren am aktuellen Strombedarf in Deutschland (Energy-Charts). */
+@Composable
+fun GridNowCard(m: MixSeries) {
+    val solar = m.solarShare
+    val ren = m.renShare
+    if (solar == null || ren == null) return
+    val zone = ZoneId.of("Europe/Berlin")
+    val z = Instant.ofEpochSecond(m.shareT).atZone(zone)
+    SectionCard(
+        title = "Strombedarf jetzt: Anteil Solar und Erneuerbare",
+        bg = Color.Black, borderColor = Color(0xFF3A3A3A), inkColor = Color(0xFFEDEDED), mutedColor = Color(0xFF9A9A9A), darken = 0f
+    ) {
+        Text(
+            "Deutschland, Stand " + String.format(Locale.GERMANY, "%02d:%02d Uhr", z.hour, z.minute),
+            fontSize = 12.sp, color = LocalMuted.current
+        )
+        listOf(
+            Triple("Solarstrom", solar, Color(0xFFE3B341)),
+            Triple("Erneuerbare gesamt", ren, Color(0xFF4FB477))
+        ).forEach { (label, pct, col) ->
+            Column {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
+                    Text(label, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(1f))
+                    Text(Calc.fmt1(pct), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = col)
+                    Text(" %", fontSize = 13.sp, color = LocalMuted.current, modifier = Modifier.padding(bottom = 4.dp))
+                }
+                Box(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFF262626))) {
+                    Box(Modifier.fillMaxWidth(fraction = (pct / 100.0).toFloat().coerceIn(0.01f, 1f)).height(10.dp).background(col))
+                }
+            }
+        }
+        Text(
+            "Anteil an der aktuellen Last (Stromverbrauch) in Deutschland. Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)",
+            fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp
+        )
+    }
+}
+
+/**
+ * Eine Tageskachel: Leistungskurve (gemeinsame Skala für alle Tage) und Temperaturverlauf.
+ * [k] = Index des Tages in [f]; Skalen kommen von außen, damit die Tage vergleichbar sind.
+ */
+@Composable
+fun DayCard(f: Forecast, k: Int, topW: Double, stepW: Double, tMin: Double, tMax: Double, base: Color) {
+    val d = f.days[k]
+    val dark = base.luminance() > 0.45f
+    val ink = if (dark) Color(0xFF2B1600) else Color.White
+    val muted = if (dark) Color(0xFF4A2D0C) else Color(0xFFFFF1DE)
+    val tempCol = if (dark) Color(0xFF0E2F4F) else Color(0xFF10263D)
+    val shape = RoundedCornerShape(14.dp)
+    val hs = (d.start until d.end).mapNotNull { f.hours.getOrNull(it) }
+    val tLo = hs.minOfOrNull { it.temp }
+    val tHi = hs.maxOfOrNull { it.temp }
+    val rel = k - f.todayIndex
+    Column(
+        Modifier.fillMaxWidth().clip(shape).background(cardBrush(base, 0.35f)).border(1.dp, base.copy(alpha = 0.6f), shape).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(dayName(rel, d.date).uppercase(Locale.GERMAN), fontSize = 12.sp, letterSpacing = 0.8.sp, color = muted, fontWeight = FontWeight.Bold)
+                Text(Calc.weekday(d.date) + " " + Calc.dm(d.date), fontSize = 12.sp, color = muted)
+            }
+            Text(Calc.fmt1(d.kwh), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = ink)
+            Text(" kWh", fontSize = 13.sp, color = muted, modifier = Modifier.padding(start = 2.dp, end = 10.dp, top = 8.dp))
+            WeatherIcon(Extras.kindOf(d))
+        }
+        Text(
+            "Spitze " + Calc.fmt0(d.peak) + " W gegen " + d.peakHour + " Uhr" +
+                (d.sunH?.let { " · Sonne " + Calc.fmt1(it) + " h" } ?: "") +
+                (d.cloudAvg?.let { " · Wolken " + Calc.fmt0(it) + " %" } ?: "") +
+                (if (d.rainMm >= 0.1) " · Regen " + Calc.fmt1(d.rainMm) + " mm" else "") +
+                (if (tLo != null && tHi != null) " · " + Calc.fmt0(tLo) + " bis " + Calc.fmt0(tHi) + " °C" else ""),
+            fontSize = 12.sp, color = muted, lineHeight = 16.sp
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("▇ Leistung (W, links)", fontSize = 11.sp, color = muted)
+            Text("━ Temperatur (°C, rechts)", fontSize = 11.sp, color = tempCol, fontWeight = FontWeight.SemiBold)
+        }
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val tick = remember(density, muted) {
+            android.graphics.Paint().apply {
+                isAntiAlias = true; color = muted.toArgb(); textSize = with(density) { 10.5.sp.toPx() }
+            }
+        }
+        val tickTemp = remember(density, tempCol) {
+            android.graphics.Paint().apply {
+                isAntiAlias = true; color = tempCol.toArgb(); textSize = with(density) { 10.5.sp.toPx() }; isFakeBoldText = true
+            }
+        }
+        Canvas(Modifier.fillMaxWidth().height(150.dp)) {
+            val w = size.width
+            val h = size.height
+            val ml = 40.dp.toPx()
+            val mr = 30.dp.toPx()
+            val mt = 8.dp.toPx()
+            val mb = 22.dp.toPx()
+            val iw = w - ml - mr
+            val ih = h - mt - mb
+            val nc = drawContext.canvas.nativeCanvas
+            val lo = 4
+            val hi = 22
+            fun xOf(o: Int): Float = ml + (o - lo).toFloat() / (hi - lo) * iw
+            fun yP(v: Double): Float = mt + ih - (v / topW * ih).toFloat()
+            val span = (tMax - tMin).coerceAtLeast(4.0)
+            fun yT(v: Double): Float = mt + ih - ((v - tMin) / span * ih).toFloat()
+            // Raster und linke Achse (Watt)
+            var gv = 0.0
+            tick.textAlign = android.graphics.Paint.Align.RIGHT
+            while (gv <= topW + 0.001) {
+                drawLine(
+                    color = muted.copy(alpha = if (gv == 0.0) 0.6f else 0.25f), start = Offset(ml, yP(gv)), end = Offset(w - mr, yP(gv)),
+                    strokeWidth = 1.dp.toPx()
+                )
+                nc.drawText(Calc.fmt0(gv), ml - 4.dp.toPx(), yP(gv) + 4.dp.toPx(), tick)
+                gv += stepW
+            }
+            // Rechte Achse (Temperatur): Mitte und Ränder
+            tickTemp.textAlign = android.graphics.Paint.Align.LEFT
+            nc.drawText(Calc.fmt0(tMin + span), w - mr + 4.dp.toPx(), mt + 10.dp.toPx(), tickTemp)
+            nc.drawText(Calc.fmt0(tMin), w - mr + 4.dp.toPx(), mt + ih, tickTemp)
+            // Stundenmarken
+            tick.textAlign = android.graphics.Paint.Align.CENTER
+            for (hh in intArrayOf(6, 9, 12, 15, 18, 21)) nc.drawText(hh.toString(), xOf(hh), h - 5.dp.toPx(), tick)
+            // Leistung
+            val area = Path()
+            val line = Path()
+            var first = true
+            for ((idx, x) in hs.withIndex()) {
+                val o = idx
+                if (o < lo || o > hi) continue
+                val px = xOf(o)
+                val py = yP(x.power)
+                if (first) { line.moveTo(px, py); area.moveTo(px, yP(0.0)); area.lineTo(px, py); first = false }
+                else { line.lineTo(px, py); area.lineTo(px, py) }
+            }
+            if (!first) {
+                area.lineTo(xOf(minOf(hi, hs.size - 1)), yP(0.0))
+                area.close()
+                drawPath(area, color = Color.White.copy(alpha = if (dark) 0.45f else 0.30f))
+                drawPath(line, color = if (dark) Color(0xFF2B1600) else Color.White, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+            }
+            // Temperatur
+            val tl = Path()
+            var tf = true
+            for ((idx, x) in hs.withIndex()) {
+                if (idx < lo || idx > hi) continue
+                val px = xOf(idx)
+                val py = yT(x.temp)
+                if (tf) { tl.moveTo(px, py); tf = false } else tl.lineTo(px, py)
+            }
+            if (!tf) drawPath(tl, color = tempCol, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 6f))))
+        }
+    }
+}

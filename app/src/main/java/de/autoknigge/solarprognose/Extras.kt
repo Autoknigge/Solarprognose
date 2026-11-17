@@ -15,7 +15,11 @@ data class PriceHour(val start: Long, val ct: Double)
 data class YearData(val perKwp: List<Double>, val label: String)
 
 /** Strommix-Zeitreihe: [t] Sekunden, [v] je Gruppe MW (Gruppen plus "Import" und "Export"). */
-class MixSeries(val t: LongArray, val v: Map<String, DoubleArray>, val hasTrade: Boolean)
+class MixSeries(
+    val t: LongArray, val v: Map<String, DoubleArray>, val hasTrade: Boolean,
+    /** Anteil von Solar und von allen Erneuerbaren am aktuellen Strombedarf (%), mit Zeitpunkt in Sekunden. */
+    val solarShare: Double? = null, val renShare: Double? = null, val shareT: Long = 0L
+)
 
 enum class WeatherKind { Sun, SunCloud, Cloud, Rain, Snow, Hail, Thunder, Storm }
 
@@ -50,6 +54,34 @@ object Extras {
             c < 60.0 -> WeatherKind.SunCloud
             else -> WeatherKind.Cloud
         }
+    }
+
+    fun kindOfHour(h: Hour): WeatherKind = when {
+        h.code in 96..99 -> WeatherKind.Hail
+        h.code in 95..99 -> WeatherKind.Thunder
+        h.gust >= 75.0 -> WeatherKind.Storm
+        h.code in 71..77 || h.code in 85..86 || h.snowCm >= 0.3 -> WeatherKind.Snow
+        h.code in 51..67 || h.code in 80..82 || h.precip >= 0.3 -> WeatherKind.Rain
+        h.cloud < 25.0 -> WeatherKind.Sun
+        h.cloud < 60.0 -> WeatherKind.SunCloud
+        else -> WeatherKind.Cloud
+    }
+
+    fun codeText(h: Hour): String = when (h.code) {
+        0 -> "klar"
+        1 -> "überwiegend klar"
+        2 -> "teils bewölkt"
+        3 -> "bedeckt"
+        45, 48 -> "Nebel"
+        in 51..57 -> "Niesel"
+        in 61..65 -> "Regen"
+        66, 67 -> "gefrierender Regen"
+        in 71..77 -> "Schnee"
+        in 80..82 -> "Regenschauer"
+        85, 86 -> "Schneeschauer"
+        95 -> "Gewitter"
+        96, 99 -> "Gewitter mit Hagel"
+        else -> if (h.cloud < 25.0) "klar" else if (h.cloud < 60.0) "teils bewölkt" else "bewölkt"
     }
 
     // ---------- Jahreswerte ----------
@@ -249,11 +281,15 @@ object Extras {
         val raw = keys.associateWith { DoubleArray(n) }
         var last = -1
         var haveTrade = false
+        var loadArr: org.json.JSONArray? = null
+        var rslArr: org.json.JSONArray? = null
         for (k in 0 until types.length()) {
             val ty = types.getJSONObject(k)
             val name = ty.optString("name")
             val d = ty.optJSONArray("data") ?: continue
             val lower = name.lowercase()
+            if (lower == "load") loadArr = d
+            if (lower == "renewable share of load") rslArr = d
             if (lower.contains("cross") && lower.contains("border")) {
                 haveTrade = true
                 for (i in 0 until minOf(n, d.length())) {
@@ -295,7 +331,26 @@ object Extras {
                 s / (to - from)
             }
         }
-        return MixSeries(times, out, haveTrade || cbet != null)
+        // Anteil am aktuellen Strombedarf: letzter Zeitpunkt mit Lastwert
+        var solarShare: Double? = null
+        var renShare: Double? = null
+        var shareT = 0L
+        val la = loadArr
+        if (la != null) {
+            var li = -1
+            for (i in minOf(n, la.length()) - 1 downTo 0) {
+                if (!la.isNull(i) && la.getDouble(i) > 1000.0) { li = i; break }
+            }
+            if (li >= 0) {
+                val load = la.getDouble(li)
+                solarShare = raw["Solar"]!![li] / load * 100.0
+                val rsl = rslArr
+                renShare = if (rsl != null && li < rsl.length() && !rsl.isNull(li)) rsl.getDouble(li)
+                else (raw["Solar"]!![li] + raw["Wind"]!![li] + raw["Biomasse"]!![li] + raw["Wasserkraft"]!![li]) / load * 100.0
+                shareT = t.getLong(li)
+            }
+        }
+        return MixSeries(times, out, haveTrade || cbet != null, solarShare, renShare, shareT)
     }
 
     private fun cbetMap(json: String): Map<Long, Double> {
