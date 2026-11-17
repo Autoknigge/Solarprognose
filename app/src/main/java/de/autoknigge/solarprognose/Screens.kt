@@ -443,8 +443,12 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     val temps = shown.flatMap { k -> forecast.hours.subList(forecast.days[k].start, minOf(forecast.days[k].end, forecast.hours.size)).map { it.temp } }
                     val tMin = Math.floor(temps.minOrNull() ?: 0.0)
                     val tMax = Math.ceil(temps.maxOrNull() ?: 10.0)
-                    Text("Die nächsten Tage", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Gold)
-                    shown.forEachIndexed { i, k ->
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("Die nächsten Tage", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Gold, modifier = Modifier.weight(1f))
+                        if (shown.size > 1) Text("← wischen →", fontSize = 12.sp, color = Muted)
+                    }
+                    DayPager(shown.size) { i ->
+                        val k = shown[i]
                         val frac = if (shown.size > 1) i / (shown.size - 1f) else 0f
                         DayCard(forecast, k, topW, stepW, tMin, tMax, androidx.compose.ui.graphics.lerp(TileTomorrow, Color(0xFFF5C77E), frac))
                     }
@@ -500,6 +504,22 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     modifier = Modifier.clickable { uri.openUri(IMPRINT_URL) }.padding(vertical = 6.dp)
                 )
             }
+        }
+    }
+}
+
+/** Tageskacheln zum seitlichen Wischen, rastet auf der jeweiligen Kachel ein. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun DayPager(count: Int, item: @Composable (Int) -> Unit) {
+    val st = androidx.compose.foundation.lazy.rememberLazyListState()
+    LazyRow(
+        state = st,
+        flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(st),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(count) { i ->
+            Box(Modifier.fillParentMaxWidth(0.92f)) { item(i) }
         }
     }
 }
