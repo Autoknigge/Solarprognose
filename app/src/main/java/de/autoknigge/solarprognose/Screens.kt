@@ -436,21 +436,23 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Text("Tippe oder wische ins Diagramm für Details.", fontSize = 11.5.sp, color = WarmMuted)
                 }
 
-                val shown = (forecast.todayIndex + 1 until forecast.days.size).toList()
+                val pf = full ?: forecast
+                val shown = (0 until pf.days.size).toList()
                 if (shown.isNotEmpty()) {
-                    val maxP = forecast.hours.maxOfOrNull { it.power } ?: 0.0
+                    val maxP = pf.hours.maxOfOrNull { it.power } ?: 0.0
                     val (stepW, topW) = Calc.niceScale(maxP, doubleArrayOf(100.0, 200.0, 250.0, 500.0, 1000.0, 2000.0, 2500.0), 3)
-                    val temps = shown.flatMap { k -> forecast.hours.subList(forecast.days[k].start, minOf(forecast.days[k].end, forecast.hours.size)).map { it.temp } }
+                    val temps = shown.flatMap { k -> pf.hours.subList(pf.days[k].start, minOf(pf.days[k].end, pf.hours.size)).map { it.temp } }
                     val tMin = Math.floor(temps.minOrNull() ?: 0.0)
                     val tMax = Math.ceil(temps.maxOrNull() ?: 10.0)
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Text("Die nächsten Tage", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Gold, modifier = Modifier.weight(1f))
+                        Text("Tage im Überblick", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Gold, modifier = Modifier.weight(1f))
                         if (shown.size > 1) Text("← wischen →", fontSize = 12.sp, color = Muted)
                     }
-                    DayPager(shown.size) { i ->
-                        val k = shown[i]
+                    DayPager(shown.size, pf.todayIndex.coerceIn(0, shown.size - 1)) { i ->
                         val frac = if (shown.size > 1) i / (shown.size - 1f) else 0f
-                        DayCard(forecast, k, topW, stepW, tMin, tMax, androidx.compose.ui.graphics.lerp(TileTomorrow, Color(0xFFF5C77E), frac))
+                        val col = if (i < pf.todayIndex) androidx.compose.ui.graphics.lerp(Panel2, Color(0xFF3F7F68), 0.5f)
+                        else androidx.compose.ui.graphics.lerp(TileToday, Color(0xFFF5C77E), ((i - pf.todayIndex) / (shown.size - 1 - pf.todayIndex).coerceAtLeast(1).toFloat()))
+                        DayCard(pf, i, topW, stepW, tMin, tMax, col)
                     }
                 }
 
@@ -511,8 +513,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 /** Tageskacheln zum seitlichen Wischen, rastet auf der jeweiligen Kachel ein. */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun DayPager(count: Int, item: @Composable (Int) -> Unit) {
-    val st = androidx.compose.foundation.lazy.rememberLazyListState()
+private fun DayPager(count: Int, start: Int, item: @Composable (Int) -> Unit) {
+    val st = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = start)
     LazyRow(
         state = st,
         flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(st),

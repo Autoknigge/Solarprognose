@@ -417,10 +417,10 @@ fun DayCard(f: Forecast, k: Int, topW: Double, stepW: Double, tMin: Double, tMax
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(dayName(rel, d.date).uppercase(Locale.GERMAN), fontSize = 12.sp, letterSpacing = 0.8.sp, color = muted, fontWeight = FontWeight.Bold)
-                Text(Calc.weekday(d.date) + " " + Calc.dm(d.date), fontSize = 12.sp, color = muted)
-            }
+            Text(
+                (if (rel in -2..1) dayName(rel, d.date).uppercase(Locale.GERMAN) + " · " else "") + Calc.weekday(d.date) + " " + Calc.dm(d.date),
+                fontSize = 13.sp, letterSpacing = 0.6.sp, color = muted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
+            )
             Text(Calc.fmt1(d.kwh), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = ink)
             Text(" kWh", fontSize = 13.sp, color = muted, modifier = Modifier.padding(start = 2.dp, end = 10.dp, top = 8.dp))
             WeatherIcon(Extras.kindOf(d))
