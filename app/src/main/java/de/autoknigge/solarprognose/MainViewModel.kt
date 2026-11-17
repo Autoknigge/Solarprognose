@@ -69,6 +69,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         selectedIds = first
         showCached()
         refresh()
+        watchNetwork()
     }
 
     private fun showCached() {
@@ -126,18 +127,64 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             viewModelScope.launch {
                 running++
                 try {
-                    val r = Repo.fetch(ctx, p)
-                    raws = raws + (p.id to r)
-                    if (p.id == selectedId) fetchedAt = System.currentTimeMillis()
-                    Repo.saveSummary(ctx, p, r)
-                    SolarWidget.updateAll(ctx)
-                } catch (e: Exception) {
-                    error = "Die Prognose konnte nicht geladen werden (" + (e.message ?: "Netzwerkfehler") + ")."
+                    // Kurzzeitige Netzfehler (z. B. DNS direkt nach dem Aufwachen) automatisch wiederholen
+                    val waits = longArrayOf(2_000, 6_000, 15_000)
+                    var attempt = 0
+                    while (true) {
+                        try {
+                            val r = Repo.fetch(ctx, p)
+                            raws = raws + (p.id to r)
+                            if (p.id == selectedId) fetchedAt = System.currentTimeMillis()
+                            Repo.saveSummary(ctx, p, r)
+                            SolarWidget.updateAll(ctx)
+                            error = null
+                            break
+                        } catch (e: Exception) {
+                            if (attempt >= waits.size) {
+                                error = "Die Prognose konnte nicht geladen werden (" + (e.message ?: "Netzwerkfehler") +
+                                    "). Die App versucht es automatisch erneut, sobald wieder Netz da ist."
+                                break
+                            }
+                            kotlinx.coroutines.delay(waits[attempt])
+                            attempt++
+                        }
+                    }
                 } finally {
                     running--
                 }
             }
         }
+    }
+
+    private var netCallback: android.net.ConnectivityManager.NetworkCallback? = null
+
+    /** Sobald wieder Netz da ist und die letzte Abfrage gescheitert war (oder die Daten alt sind), neu laden. */
+    private fun watchNetwork() {
+        try {
+            val cm = ctx.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            val cb = object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) {
+                    viewModelScope.launch {
+                        val stale = System.currentTimeMillis() - fetchedAt > 20 * 60_000L
+                        if (error != null || stale) {
+                            kotlinx.coroutines.delay(1_500)
+                            if (running == 0) refresh()
+                        }
+                    }
+                }
+            }
+            cm.registerDefaultNetworkCallback(cb)
+            netCallback = cb
+        } catch (e: Exception) {
+        }
+    }
+
+    override fun onCleared() {
+        try {
+            netCallback?.let { (ctx.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager).unregisterNetworkCallback(it) }
+        } catch (e: Exception) {
+        }
+        super.onCleared()
     }
 
     /** Zeigt genau eine Anlage. */
