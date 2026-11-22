@@ -282,7 +282,7 @@ object Extras {
      * Nettostromerzeugung je Gruppe (MW) plus Import/Export (MW, beides positiv). Auf höchstens [maxPoints] Zeitpunkte
      * gemittelt. Schneidet hinten alles ab, wofür noch keine Erzeugungswerte vorliegen.
      */
-    fun parseMixSeries(json: String, maxPoints: Int, cbet: Map<Long, Double>? = null): MixSeries? {
+    fun parseMixSeries(json: String, maxPoints: Int, cbet: java.util.TreeMap<Long, DoubleArray>? = null): MixSeries? {
         val o = JSONObject(json)
         val t = o.getJSONArray("unix_seconds")
         val types = o.getJSONArray("production_types")
@@ -325,11 +325,17 @@ object Extras {
             }
         }
         if (last < 0) return null
-        if (!haveTrade && cbet != null) {
+        // Handel über alle Grenzen einzeln (brutto): Import = Summe aller Einfuhren, Export = Summe aller Ausfuhren.
+        // Die Gesamtzeile aus public_power ist nur der Saldo und würde Import und Export gegeneinander aufrechnen.
+        if (cbet != null && cbet.isNotEmpty()) {
             for (i in 0..last) {
-                val v = cbet[t.getLong(i)] ?: continue
-                if (v > 0) raw["Import"]!![i] = v else raw["Export"]!![i] = -v
+                val ts = t.getLong(i)
+                val en = cbet.floorEntry(ts) ?: continue
+                if (ts - en.key > 3600L) continue
+                raw["Import"]!![i] = en.value[0]
+                raw["Export"]!![i] = en.value[1]
             }
+            haveTrade = true
         }
         val len = last + 1
         val step = Math.ceil(len / maxPoints.toDouble()).toInt().coerceAtLeast(1)
@@ -367,16 +373,19 @@ object Extras {
         return MixSeries(times, out, haveTrade || cbet != null, solarShare, renShare, shareT)
     }
 
-    private fun cbetMap(json: String): Map<Long, Double> {
+    /** Grenzüberschreitender Handel je Land (GW), als MW: je Zeitpunkt [Summe der Einfuhren, Summe der Ausfuhren]. */
+    private fun cbetMap(json: String): java.util.TreeMap<Long, DoubleArray> {
         val o = JSONObject(json)
         val t = o.getJSONArray("unix_seconds")
-        val cs = o.optJSONArray("countries") ?: return emptyMap()
-        val m = HashMap<Long, Double>()
+        val cs = o.optJSONArray("countries") ?: return java.util.TreeMap()
+        val m = java.util.TreeMap<Long, DoubleArray>()
         for (k in 0 until cs.length()) {
             val d = cs.getJSONObject(k).optJSONArray("data") ?: continue
             for (i in 0 until minOf(t.length(), d.length())) {
                 if (d.isNull(i)) continue
-                m[t.getLong(i)] = (m[t.getLong(i)] ?: 0.0) + d.getDouble(i) * 1000.0
+                val v = d.getDouble(i) * 1000.0
+                val a = m.getOrPut(t.getLong(i)) { DoubleArray(2) }
+                if (v > 0) a[0] += v else a[1] += -v
             }
         }
         return m
@@ -390,14 +399,12 @@ object Extras {
         fun fetch(from: LocalDate, to: LocalDate, max: Int): MixSeries? {
             val base = "https://api.energy-charts.info"
             val pj = Api.get("$base/public_power?country=de&start=$from&end=$to", false)
-            var s = parseMixSeries(pj, max)
-            if (s != null && !s.hasTrade) {
-                try {
-                    s = parseMixSeries(pj, max, cbetMap(Api.get("$base/cbet?country=de&start=$from&end=$to", false)))
-                } catch (e: Exception) {
-                }
+            val trade = try {
+                cbetMap(Api.get("$base/cbet?country=de&start=$from&end=$to", false))
+            } catch (e: Exception) {
+                null
             }
-            return s
+            return parseMixSeries(pj, max, trade)
         }
         var s = when (range) {
             0 -> fetch(today, today, 96) ?: fetch(today.minusDays(1), today.minusDays(1), 96)

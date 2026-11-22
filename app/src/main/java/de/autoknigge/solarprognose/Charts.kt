@@ -311,6 +311,9 @@ fun MonthChart(
     val whitePaint = remember(density) {
         android.graphics.Paint().apply { isAntiAlias = true; color = 0xFFFFFFFF.toInt(); textSize = with(density) { 9.5.sp.toPx() }; textAlign = android.graphics.Paint.Align.CENTER; isFakeBoldText = true }
     }
+    val redPaint = remember(density) {
+        android.graphics.Paint().apply { isAntiAlias = true; color = 0xFFB00020.toInt(); textSize = with(density) { 9.5.sp.toPx() }; textAlign = android.graphics.Paint.Align.CENTER; isFakeBoldText = true }
+    }
     val orangePaint = remember(density) {
         android.graphics.Paint().apply { isAntiAlias = true; color = 0xFFFF9A2E.toInt(); textSize = with(density) { 10.5.sp.toPx() }; textAlign = android.graphics.Paint.Align.CENTER; isFakeBoldText = true }
     }
@@ -368,8 +371,8 @@ fun MonthChart(
                 }
                 drawPath(path, color = c)
             }
-            // Prognosewert weiß, alle auf gleicher Höhe unten im Balken
-            nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", v), cx, base - 5.dp.toPx(), whitePaint)
+            // Prognosewert rot (im aktuellen Monat weiß auf Orange), alle auf gleicher Höhe unten im Balken
+            nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", v), cx, base - 5.dp.toPx(), if (k == currentMonth) whitePaint else redPaint)
             // Strich: Stand der Erzeugung (schwarz innerhalb der Prognose, orange darüber), Zahl in Orange oben
             if (mk != null) {
                 val ym = base - (mk / (maxV * 1.12) * ih).toFloat()

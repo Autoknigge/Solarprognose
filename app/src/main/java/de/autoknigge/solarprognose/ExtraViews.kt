@@ -240,7 +240,7 @@ fun YearCard(kwp: Double, data: YearData, marks: List<Double>? = null) {
             }
             if (marks != null) Text(
                 androidx.compose.ui.text.buildAnnotatedString {
-                    withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append("Weiß: Prognose") }
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFFE5304A), fontWeight = FontWeight.Bold)) { append("Rot: Prognose") }
                     append(". ")
                     withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFFFF9A2E), fontWeight = FontWeight.Bold)) { append("Orange & Strich: Ergebnis bis heute") }
                 },
