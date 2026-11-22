@@ -14,6 +14,9 @@ data class PriceHour(val start: Long, val ct: Double)
 /** Monatswerte je kWp und Beschriftung der Datenbasis. */
 data class YearData(val perKwp: List<Double>, val label: String)
 
+/** Dieses Jahr bisher je Monat (kWh je kWp), aus dem Wetter berechnet. */
+data class YtdData(val perKwp: List<Double>)
+
 /** Strommix-Zeitreihe: [t] Sekunden, [v] je Gruppe MW (Gruppen plus "Import" und "Export"). */
 class MixSeries(
     val t: LongArray, val v: Map<String, DoubleArray>, val hasTrade: Boolean,
@@ -424,6 +427,53 @@ object Extras {
         synchronized(profileCache) { profileCache[key] }?.let { if (System.currentTimeMillis() - it.first < 30L * 60 * 1000) return@withContext it.second }
         val d = parseProfile(Api.profileJson(p))
         synchronized(profileCache) { profileCache[key] = System.currentTimeMillis() to d }
+        d
+    }
+
+    private val ytdCache = HashMap<String, Pair<Long, YtdData>>()
+
+    /** Dieses Jahr bisher je Monat: Archiv (bis etwa vor 5 Tagen), die letzten Tage aus der Prognose-Schnittstelle (past_days). */
+    suspend fun loadYtd(p: Plant): YtdData = withContext(Dispatchers.IO) {
+        val today = LocalDate.now()
+        val key = yearSig(p) + "/" + today
+        synchronized(ytdCache) { ytdCache[key] }?.let { if (System.currentTimeMillis() - it.first < 3L * 3600 * 1000) return@withContext it.second }
+        val sums = DoubleArray(12)
+        var last = ""
+        fun add(json: String, after: String, nowKey: String?) {
+            val h = JSONObject(json).getJSONObject("hourly")
+            val time = h.getJSONArray("time")
+            val gti = h.getJSONArray("global_tilted_irradiance")
+            val tmp = h.getJSONArray("temperature_2m")
+            for (i in 0 until time.length()) {
+                if (gti.isNull(i)) continue
+                val ts = time.getString(i)
+                val d = ts.substring(0, 10)
+                if (d <= after || !d.startsWith(today.year.toString())) continue
+                if (nowKey != null && ts.substring(0, 13) > nowKey) continue
+                val g = gti.getDouble(i).coerceAtLeast(0.0)
+                val t = if (tmp.isNull(i)) 10.0 else tmp.getDouble(i)
+                val w = g * (1.0 - 0.004 * (t + g * 0.031 - 25.0)) * (p.eff / 100.0)
+                sums[ts.substring(5, 7).toInt() - 1] += w.coerceAtLeast(0.0)
+                if (d > last) last = d
+            }
+        }
+        if (today.dayOfYear > 1) {
+            val json = Api.get(
+                "https://archive-api.open-meteo.com/v1/archive?latitude=${p.lat}&longitude=${p.lon}&tilt=${p.tilt}&azimuth=${p.az}" +
+                    "&start_date=${today.year}-01-01&end_date=${today.minusDays(1)}&hourly=global_tilted_irradiance,temperature_2m&timezone=auto", false
+            )
+            add(json, "", null)
+        }
+        if (last < today.toString()) {
+            val json = Api.get(
+                "https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&tilt=${p.tilt}&azimuth=${p.az}" +
+                    "&hourly=global_tilted_irradiance,temperature_2m&past_days=10&forecast_days=1&timezone=auto", false
+            )
+            val z = try { java.time.ZoneId.of(JSONObject(json).optString("timezone", "Europe/Berlin")) } catch (e: Exception) { java.time.ZoneId.systemDefault() }
+            add(json, last, java.time.LocalDateTime.now(z).toString().substring(0, 13))
+        }
+        val d = YtdData(sums.map { it / 1000.0 })
+        synchronized(ytdCache) { ytdCache[key] = System.currentTimeMillis() to d }
         d
     }
 }

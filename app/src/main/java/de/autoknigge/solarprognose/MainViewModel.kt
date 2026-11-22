@@ -42,6 +42,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Börsenpreise ab heute, falls geladen. */
     var prices by mutableStateOf<List<PriceHour>?>(null)
+    var ytd by mutableStateOf<Map<String, YtdData>>(emptyMap())
+        private set
     var profile by mutableStateOf<Map<String, ProfileData>>(emptyMap())
         private set
     var profileFailed by mutableStateOf(false)
@@ -94,6 +96,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 try {
                     val y = Extras.loadYear(ctx, p)
                     years = years + (p.id to y)
+                } catch (e: Exception) {
+                }
+                try {
+                    ytd = ytd + (p.id to Extras.loadYtd(p))
                 } catch (e: Exception) {
                 }
             }

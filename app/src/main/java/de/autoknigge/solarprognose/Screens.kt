@@ -155,7 +155,7 @@ fun SectionCard(
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (title.isNotEmpty() || trailing != null) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = inkColor, modifier = Modifier.weight(1f))
             trailing?.invoke()
         }
@@ -334,11 +334,17 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val best = forecast.days.maxByOrNull { it.kwh } ?: d0
                 val rest = nowC?.let { Calc.remainingToday(forecast, it) }
 
+                val uvNow = nowC?.let { c ->
+                    val cur = forecast.hours.getOrNull(Math.floor(c).toInt() + 1)?.uv ?: 0.0
+                    if (cur > 0.0) cur else d0.uvMax
+                }?.takeIf { it > 0.0 }
+                val sunNow = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone)
                 val curH = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1) }
                 if (curH != null) {
                     Tile(
                         "Jetzt", Calc.fmt1(curH.temp), "°C",
-                        Extras.codeText(curH) + " · Wolken " + Calc.fmt0(curH.cloud) + " %" + (if (curH.gust >= 20.0) " · Böen " + Calc.fmt0(curH.gust) + " km/h" else ""),
+                        Extras.codeText(curH) + " · Wolken " + Calc.fmt0(curH.cloud) + " %" + (if (curH.gust >= 20.0) " · Böen " + Calc.fmt0(curH.gust) + " km/h" else "") +
+                            "\n" + (uvNow?.let { "UV-Index " + Calc.fmt1(it) + " · " } ?: "") + (sunNow?.let { "Sonne ⬆️ " + it.first + "  ⬇️ " + it.second } ?: ""),
                         Modifier.fillMaxWidth(), icon = Extras.kindOfHour(curH), bg = Panel2
                     )
                 }
@@ -353,12 +359,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Tile("Bester Tag", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight())
                 }
 
-                val uvNow = nowC?.let { c ->
-                    val cur = forecast.hours.getOrNull(Math.floor(c).toInt() + 1)?.uv ?: 0.0
-                    if (cur > 0.0) cur else d0.uvMax
-                }?.takeIf { it > 0.0 }
                 val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0) }
-                if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, uv = uvNow, sun = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone), sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
+                if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
 
                 val dayF = full ?: forecast
                 val hourF = if (range == -2) dayF else forecast
@@ -467,7 +469,9 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 if (ys.isNotEmpty()) {
                     val kwpSum = ys.sumOf { it.first.kwp }
                     val weighted = (0 until 12).map { m -> ys.sumOf { it.second.perKwp[m] * it.first.kwp } / kwpSum }
-                    YearCard(kwpSum, YearData(weighted, ys.first().second.label))
+                    val ytds = ys.map { vm.ytd[it.first.id] }
+                    val marks = if (ytds.all { it != null }) (0 until 12).map { m -> ys.indices.sumOf { k -> ytds[k]!!.perKwp[m] * ys[k].first.kwp } } else null
+                    YearCard(kwpSum, YearData(weighted, ys.first().second.label), marks)
                 }
 
                 vm.mixSeries[0]?.let { GridNowCard(it) }

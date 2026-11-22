@@ -302,7 +302,8 @@ fun MonthChart(
     currentMonth: Int,
     selected: Int?,
     onSelect: (Int?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    marks: List<Double>? = null
 ) {
     val density = LocalDensity.current
     val paints = remember(density) { ChartPaints(with(density) { 10.sp.toPx() }, with(density) { 10.5.sp.toPx() }) }
@@ -333,7 +334,7 @@ fun MonthChart(
         val band = (w - 2 * m) / n
         val bw = band * 0.72f
         val base = mt + ih
-        val maxV = maxOf(1.0, values.maxOrNull() ?: 1.0)
+        val maxV = maxOf(1.0, values.maxOrNull() ?: 1.0, marks?.take(currentMonth + 1)?.maxOrNull() ?: 0.0)
         val nativeCanvas = drawContext.canvas.nativeCanvas
 
         drawLine(color = AxisColor, start = Offset(m, base), end = Offset(w - m, base), strokeWidth = 1.dp.toPx())
@@ -362,6 +363,13 @@ fun MonthChart(
             }
             nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", v), cx, minOf(y, base - 2.dp.toPx()) - 5.dp.toPx(), paints.barLabel)
             nativeCanvas.drawText(MONTHS[k], cx, base + 15.dp.toPx(), if (k == currentMonth) paints.dayToday else paints.tickCenter)
+            // Strich: bisher erreicht (dieses Jahr)
+            val mk = marks?.getOrNull(k)
+            if (mk != null && k <= currentMonth) {
+                val ym = base - (mk / (maxV * 1.12) * ih).toFloat()
+                drawLine(Color.White, Offset(x - 3.dp.toPx(), ym), Offset(x + bw + 3.dp.toPx(), ym), strokeWidth = 5.dp.toPx())
+                drawLine(Color(0xFF0E2F4F), Offset(x - 3.dp.toPx(), ym), Offset(x + bw + 3.dp.toPx(), ym), strokeWidth = 3.dp.toPx())
+            }
         }
     }
 }

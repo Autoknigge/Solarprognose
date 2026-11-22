@@ -153,54 +153,45 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
     }
 }
 
-/** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest in einem Feld. */
+/** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest, kompakt. */
 @Composable
-fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sun: Pair<String, String>? = null, uv: Double? = null, sunTotal: Double? = null, sunRest: Double? = null) {
+fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sunTotal: Double? = null, sunRest: Double? = null) {
     val done = (total - rest).coerceAtLeast(0.0)
     val frac = if (total > 0.0) (done / total).toFloat().coerceIn(0f, 1f) else 0f
-    SectionCard(title = "Heute im Verlauf", trailing = sun?.let { s -> {
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            if (uv != null) {
-                Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, modifier = Modifier.padding(end = 10.dp)) {
-                    Text("UV", fontSize = 10.sp, color = Muted, lineHeight = 11.sp)
-                    Text(Calc.fmt1(uv), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Ink, lineHeight = 14.sp)
-                }
-            }
-            Text(s.first + " ⬆️  " + s.second + " ⬇️", fontSize = 13.sp, color = Ink)
-        }
-    } }) {
-        if (nowKw != null) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Stat("Jetzt (Leistung)", Calc.fmt2(nowKw), "kW", TileToday)
-                Text("≈ " + Calc.fmt0(nowKw * 1000.0) + " W", fontSize = 13.sp, color = Muted, modifier = Modifier.padding(top = 14.dp))
-            }
-        }
+    SectionCard(title = "") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Stat("Prognose heute", Calc.fmt1(total), "kWh")
-            Stat("bisher erzeugt", Calc.fmt1(done), "kWh", TodayOrange)
-            Stat("noch erwartet", Calc.fmt1(rest), "kWh", GoldSoft)
+            if (nowKw != null) CompactStat("Jetzt", Calc.fmt2(nowKw), "kW", TileToday)
+            CompactStat("Prognose", Calc.fmt1(total), "kWh")
+            CompactStat("bisher", Calc.fmt1(done), "kWh", TodayOrange)
+            CompactStat("noch", Calc.fmt1(rest), "kWh", GoldSoft)
         }
-        if (sunTotal != null) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Stat("Sonnenschein heute", Calc.fmt1(sunTotal), "h")
-                if (sunRest != null) Stat("noch erwartet", Calc.fmt1(sunRest), "h", GoldSoft)
-            }
-        }
-        Row(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)).background(Panel2)) {
+        Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Panel2)) {
             if (frac > 0.001f) Box(Modifier.weight(frac).fillMaxHeight().background(TodayOrange))
             if (frac < 0.999f) Box(Modifier.weight(1f - frac).fillMaxHeight().background(GoldSoft.copy(alpha = 0.35f)))
         }
         Text(
-            "„Bisher“ ist aus dem Wetter berechnet, nicht an deiner Anlage gemessen.",
-            fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
+            (if (sunTotal != null) "Sonne heute " + Calc.fmt1(sunTotal) + " h" + (if (sunRest != null) ", noch " + Calc.fmt1(sunRest) + " h" else "") + " · " else "") +
+                "„Bisher“ aus dem Wetter berechnet, nicht gemessen.",
+            fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
+    }
+}
+
+@Composable
+private fun CompactStat(label: String, value: String, unit: String, color: Color = Ink) {
+    Column {
+        Text(label, fontSize = 10.5.sp, color = Muted)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
+            Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
+            Text(" $unit", fontSize = 11.sp, color = Muted, modifier = Modifier.padding(bottom = 2.dp))
+        }
     }
 }
 
 // ---------- Jahresprognose ----------
 
 @Composable
-fun YearCard(kwp: Double, data: YearData) {
+fun YearCard(kwp: Double, data: YearData, marks: List<Double>? = null) {
     val perKwp = data.perKwp
     var sel by remember { mutableStateOf<Int?>(null) }
     val months = perKwp.map { it * kwp }
@@ -212,15 +203,21 @@ fun YearCard(kwp: Double, data: YearData) {
         Text(
             if (s != null && s < months.size) {
                 val days = YearMonth.of(today.year, s + 1).lengthOfMonth()
-                names[s] + ": " + Calc.fmt0(months[s]) + " kWh\nØ " + Calc.fmt1(months[s] / days) + " kWh pro Tag"
+                val mk = marks?.getOrNull(s)?.takeIf { s <= today.monthValue - 1 }
+                names[s] + ": Prognose " + Calc.fmt0(months[s]) + " kWh · Ø " + Calc.fmt1(months[s] / days) + " kWh pro Tag" +
+                    (if (mk != null) "\nDieses Jahr " + (if (s == today.monthValue - 1) "bisher " else "") + Calc.fmt0(mk) + " kWh (" + Calc.fmt0(if (months[s] > 0) mk / months[s] * 100.0 else 0.0) + " % der Prognose)" else "")
             } else {
-                "Etwa " + Calc.fmt0(total) + " kWh pro Jahr\nTippe auf einen Balken für Details."
+                val ytdSum = marks?.take(today.monthValue)?.sum()
+                "Etwa " + Calc.fmt0(total) + " kWh pro Jahr" +
+                    (if (ytdSum != null) "\nBisher dieses Jahr " + Calc.fmt0(ytdSum) + " kWh" else "") +
+                    "\nTippe auf einen Balken für Details."
             },
             fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp
         )
-        MonthChart(values = months, currentMonth = today.monthValue - 1, selected = sel, onSelect = { sel = it })
+        if (marks != null) Text("▇ Prognose je Monat   ━ Strich: dieses Jahr bisher erreicht", fontSize = 11.5.sp, color = Muted)
+        MonthChart(values = months, currentMonth = today.monthValue - 1, selected = sel, onSelect = { sel = it }, marks = marks)
         Text(
-            data.label + ", kein Wert für ein einzelnes Jahr. Ohne Verschattung, Schnee und Wechselrichter-Grenze.",
+            data.label + ", kein Wert für ein einzelnes Jahr. Der Strich zeigt die Werte dieses Jahres, aus dem Wetter berechnet (nicht gemessen). Ohne Verschattung, Schnee und Wechselrichter-Grenze.",
             fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
         )
     }
