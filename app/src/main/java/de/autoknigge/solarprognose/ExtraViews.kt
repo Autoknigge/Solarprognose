@@ -318,9 +318,13 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
     val co2 = series?.let { sr ->
         val nn = sr.t.size
         val si = sel
-        fun a(g: String): Double = if (si != null) sr.v[g]!![si.coerceIn(0, nn - 1)] else sr.v[g]!!.average()
+        fun a(g: String): Double = sr.v[g]?.let { if (si != null) it[si.coerceIn(0, nn - 1)] else it.average() } ?: 0.0
         val p = MIX_GROUPS_UI.sumOf { a(it) }
-        if (p > 0.0) MIX_GROUPS_UI.sumOf { a(it) * (CO2_G[it] ?: 0.0) } / p else null
+        // Kohle getrennt nach Braun- (1105 g/kWh) und Steinkohle (970 g/kWh), sonst Mittelwert
+        val brown = a("Braunkohle")
+        val hard = a("Steinkohle")
+        val coal = if (brown + hard > 0.0) brown * 1105.0 + hard * 970.0 else a("Kohle") * (CO2_G["Kohle"] ?: 0.0)
+        if (p > 0.0) (MIX_GROUPS_UI.filter { it != "Kohle" }.sumOf { a(it) * (CO2_G[it] ?: 0.0) } + coal) / p else null
     }
     SectionCard(
         title = "Strommix Deutschland",

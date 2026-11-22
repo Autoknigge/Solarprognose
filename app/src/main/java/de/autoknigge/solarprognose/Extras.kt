@@ -288,7 +288,7 @@ object Extras {
         val types = o.getJSONArray("production_types")
         val n = t.length()
         if (n == 0) return null
-        val keys = MIX_GROUPS + listOf("Import", "Export")
+        val keys = MIX_GROUPS + listOf("Import", "Export", "Braunkohle", "Steinkohle")
         val raw = keys.associateWith { DoubleArray(n) }
         var last = -1
         var haveTrade = false
@@ -312,11 +312,14 @@ object Extras {
             }
             val g = mixGroup(name) ?: continue
             val a = raw[g]!!
+            // Kohle zusätzlich getrennt (Braun-/Steinkohle) für die CO2-Schätzung
+            val sub = if (g == "Kohle") raw[if (lower.contains("brown") || lower.contains("lignite")) "Braunkohle" else "Steinkohle"] else null
             for (i in 0 until minOf(n, d.length())) {
                 if (d.isNull(i)) continue
                 val v = d.getDouble(i)
                 if (v > 0) {
                     a[i] += v
+                    if (sub != null) sub[i] += v
                     if (i > last) last = i
                 }
             }
