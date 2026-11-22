@@ -36,6 +36,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -291,7 +292,13 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         PlantChip(p.name, p.id in vm.selectedIds) { vm.select(p.id) }
                     }
                     if (vm.plants.size >= 2) {
-                        item(key = "total") { PlantChip("Σ Gesamt", group) { showGroupDialog = true } }
+                        items(vm.groups, key = { "g" + it.id }) { g ->
+                            PlantChip("Σ " + g.name, g.ids.toSet() == vm.selectedIds.toSet()) { vm.setSelection(g.ids) }
+                        }
+                        item(key = "total") {
+                            val saved = vm.groups.any { it.ids.toSet() == vm.selectedIds.toSet() }
+                            PlantChip(if (vm.groups.isEmpty()) "Σ Gesamt" else "Σ Gruppen", group && !saved) { showGroupDialog = true }
+                        }
                     }
                 }
                 if (!group) IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Anlage bearbeiten", tint = Ink) }
@@ -544,12 +551,26 @@ private fun PlantChip(label: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun GroupDialog(vm: MainViewModel, onDismiss: () -> Unit) {
     var ids by remember { mutableStateOf(vm.selectedIds.toSet()) }
+    var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Gesamtleistung") },
         text = {
-            Column {
-                Text("Welche Anlagen sollen zusammengezählt werden?", fontSize = 13.sp)
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (vm.groups.isNotEmpty()) {
+                    Text("Gespeicherte Gruppen", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    vm.groups.forEach { g ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                g.name + " (" + g.ids.size + " Anlagen)", fontSize = 14.sp,
+                                modifier = Modifier.weight(1f).clickable { ids = g.ids.toSet(); name = g.name }.padding(vertical = 8.dp)
+                            )
+                            IconButton(onClick = { vm.deleteGroup(g.id) }) { Icon(Icons.Filled.Close, contentDescription = "Gruppe löschen") }
+                        }
+                    }
+                    Text("Tippen lädt die Gruppe zum Ändern.", fontSize = 12.sp)
+                }
+                Text("Welche Anlagen sollen zusammengezählt werden?", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
                 vm.plants.forEach { p ->
                     Row(
                         Modifier.fillMaxWidth().clickable { ids = if (p.id in ids) ids - p.id else ids + p.id },
@@ -560,10 +581,19 @@ private fun GroupDialog(vm: MainViewModel, onDismiss: () -> Unit) {
                     }
                 }
                 TextButton(onClick = { ids = vm.plants.map { it.id }.toSet() }) { Text("Alle wählen") }
+                androidx.compose.material3.OutlinedTextField(
+                    value = name, onValueChange = { name = it }, singleLine = true,
+                    label = { Text("Als Gruppe speichern (Name, optional)") }, modifier = Modifier.fillMaxWidth()
+                )
             }
         },
         confirmButton = {
-            TextButton(enabled = ids.isNotEmpty(), onClick = { vm.setSelection(vm.plants.map { it.id }.filter { it in ids }); onDismiss() }) { Text("Anzeigen") }
+            TextButton(enabled = ids.isNotEmpty(), onClick = {
+                val list = vm.plants.map { it.id }.filter { it in ids }
+                if (name.isNotBlank() && list.size >= 2) vm.saveGroup(name, list)
+                vm.setSelection(list)
+                onDismiss()
+            }) { Text("Anzeigen") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
     )

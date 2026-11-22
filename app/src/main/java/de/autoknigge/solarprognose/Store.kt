@@ -36,6 +36,30 @@ class Store(context: Context) {
             sp.edit().putString("selected_ids", v.joinToString(",")).apply()
         }
 
+    /** Benannte Gruppen von Anlagen. */
+    var groups: List<PlantGroup>
+        get() = try {
+            val a = JSONArray(sp.getString("groups", "[]"))
+            List(a.length()) { i ->
+                val o = a.getJSONObject(i)
+                val j = o.getJSONArray("ids")
+                PlantGroup(o.getString("id"), o.getString("name"), List(j.length()) { k -> j.getString(k) })
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+        set(v) {
+            val a = JSONArray()
+            v.forEach { g ->
+                val o = org.json.JSONObject()
+                o.put("id", g.id)
+                o.put("name", g.name)
+                o.put("ids", JSONArray(g.ids))
+                a.put(o)
+            }
+            sp.edit().putString("groups", a.toString()).apply()
+        }
+
     var notifyOn: Boolean
         get() = sp.getBoolean("notify_on", false)
         set(v) {

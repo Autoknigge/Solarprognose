@@ -182,3 +182,6 @@ class ProfileData(
 ) {
     val hasLevels: Boolean get() = cc.any { r -> r.any { !it.isNaN() } } && gh.any { r -> r.any { !it.isNaN() } }
 }
+
+/** Benannte Auswahl mehrerer Anlagen für die Gesamtansicht. */
+data class PlantGroup(val id: String, val name: String, val ids: List<String>)

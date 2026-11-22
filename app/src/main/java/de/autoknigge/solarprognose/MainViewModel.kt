@@ -51,6 +51,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var mixFailed by mutableStateOf<Set<Int>>(emptySet())
         private set
 
+    var groups by mutableStateOf(store.groups)
+        private set
+
     var notifyOn by mutableStateOf(store.notifyOn)
         private set
 
@@ -215,6 +218,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         refresh()
     }
 
+    /** Speichert eine benannte Gruppe (gleicher Name überschreibt). */
+    fun saveGroup(name: String, ids: List<String>) {
+        val n = name.trim()
+        val valid = plants.filter { it.id in ids }.map { it.id }
+        if (n.isEmpty() || valid.size < 2) return
+        val ex = groups.firstOrNull { it.name.equals(n, ignoreCase = true) }
+        groups = if (ex != null) groups.map { if (it.id == ex.id) it.copy(ids = valid) else it }
+        else groups + PlantGroup(java.util.UUID.randomUUID().toString(), n, valid)
+        store.groups = groups
+    }
+
+    fun deleteGroup(id: String) {
+        groups = groups.filter { it.id != id }
+        store.groups = groups
+    }
+
     fun savePlant(p: Plant) {
         val known = plants.any { it.id == p.id }
         plants = if (known) plants.map { if (it.id == p.id) p else it } else {
@@ -229,6 +248,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         plants = plants.filter { it.id != id }
         store.savePlants(plants)
         Repo.forget(ctx, id)
+        groups = groups.map { it.copy(ids = it.ids.filter { i -> i != id }) }.filter { it.ids.size >= 2 }
+        store.groups = groups
         if (id in selectedIds) {
             val rest = selectedIds.filter { it != id }
             raws = raws - id
