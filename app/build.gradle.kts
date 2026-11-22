@@ -59,6 +59,9 @@ android {
         create("preview") {
             initWith(getByName("release"))
             applicationIdSuffix = ".test"
+            // Ohne R8-Verkleinerung: Fehlerberichte bleiben lesbar
+            isMinifyEnabled = false
+            isShrinkResources = false
             manifestPlaceholders["appLabel"] = "Solarprognose Test"
             matchingFallbacks += "release"
         }
