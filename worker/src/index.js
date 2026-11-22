@@ -102,7 +102,7 @@ async function profile(url, env, ctx) {
     ...PROFILE_LEVELS.map((l) => `geopotential_height_${l}hPa`),
   ].join(",");
   return cached(ctx, `https://cache.invalid/profile/${lat}/${lon}`, FORECAST_TTL, () =>
-    upstream(openMeteo(env, "api", `latitude=${lat}&longitude=${lon}&hourly=${vars}&forecast_days=5&timezone=auto`))
+    upstream(openMeteo(env, "api", `latitude=${lat}&longitude=${lon}&hourly=${vars}&forecast_days=7&timezone=auto`))
   );
 }
 

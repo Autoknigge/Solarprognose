@@ -447,7 +447,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val shown = (0 until pf.days.size).toList()
                 if (shown.isNotEmpty()) {
                     val maxP = pf.hours.maxOfOrNull { it.power } ?: 0.0
-                    val (stepW, topW) = Calc.niceScale(maxP, doubleArrayOf(100.0, 200.0, 250.0, 500.0, 1000.0, 2000.0, 2500.0), 3)
+                    val (stepW, topW) = Calc.niceScale(maxP, doubleArrayOf(100.0, 200.0, 250.0, 500.0, 1000.0, 2000.0, 2500.0, 5000.0, 10000.0), 3)
                     val temps = shown.flatMap { k -> pf.hours.subList(pf.days[k].start, minOf(pf.days[k].end, pf.hours.size)).map { it.temp } }
                     val tMin = Math.floor(temps.minOrNull() ?: 0.0)
                     val tMax = Math.ceil(temps.maxOrNull() ?: 10.0)
@@ -470,6 +470,10 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     YearCard(kwpSum, YearData(weighted, ys.first().second.label))
                 }
 
+                vm.mixSeries[0]?.let { GridNowCard(it) }
+                MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed) { vm.selectMix(it) }
+                if (vm.selectedId != null) ProfileCard(vm.selectedId?.let { vm.profile[it] }, vm.profileFailed)
+
                 SectionCard(title = "Tabelle", bg = TileTomorrow, borderColor = Color(0xFFE8A060), mutedColor = WarmMuted) {
                     Row(Modifier.fillMaxWidth()) {
                         listOf("Tag" to 1.2f, "Ertrag" to 1f, "Spitze" to 0.95f, "Wolken" to 0.85f, "Sonne" to 0.75f).forEach { (t, w) ->
@@ -480,17 +484,14 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                             Text(dayName(k - dayF.todayIndex, d.date).let { if (k - dayF.todayIndex in -1..1 || k - dayF.todayIndex == -2) it else Calc.weekday(d.date) } + " " + Calc.dm(d.date), fontSize = 13.sp, color = Ink, fontWeight = if (k == dayF.todayIndex) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1.2f))
                             Text(Calc.fmt1(d.kwh) + " kWh", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(1f))
-                            Text(Calc.fmt0(d.peak) + " W", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(0.95f))
+                            Text(Calc.fmt1(d.peak / 1000.0) + " kW", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(0.95f))
                             Text(d.cloudAvg?.let { Calc.fmt0(it) + " %" } ?: "–", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(0.85f))
                             Text(d.sunH?.let { Calc.fmt1(it) + " h" } ?: "–", fontSize = 13.sp, color = Ink, modifier = Modifier.weight(0.75f))
                         }
                     }
                 }
 
-                if (vm.selectedId != null) ProfileCard(vm.selectedId?.let { vm.profile[it] }, vm.profileFailed)
                 vm.prices?.let { pr -> if (pr.isNotEmpty()) PriceCard(pr, nowSec) }
-                vm.mixSeries[0]?.let { GridNowCard(it) }
-                MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed) { vm.selectMix(it) }
             }
 
             Text(
@@ -529,7 +530,7 @@ private fun DayPager(count: Int, start: Int, item: @Composable (Int) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         items(count) { i ->
-            Box(Modifier.fillParentMaxWidth(0.92f)) { item(i) }
+            Box(Modifier.fillParentMaxWidth(0.97f)) { item(i) }
         }
     }
 }
