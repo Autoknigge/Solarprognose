@@ -423,6 +423,37 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Text("Tippe oder wische ins Diagramm für Details.", fontSize = 11.5.sp, color = WarmMuted)
                 }
 
+                val pf = full ?: forecast
+                val shown = (0 until pf.days.size).toList()
+                if (shown.isNotEmpty()) {
+                    val maxP = pf.hours.maxOfOrNull { it.power } ?: 0.0
+                    val (stepW, topW) = Calc.niceScale(maxP, doubleArrayOf(100.0, 200.0, 250.0, 500.0, 1000.0, 2000.0, 2500.0, 5000.0, 10000.0), 3)
+                    val temps = shown.flatMap { k -> pf.hours.subList(pf.days[k].start, minOf(pf.days[k].end, pf.hours.size)).map { it.temp } }
+                    val tMin = Math.floor(temps.minOrNull() ?: 0.0)
+                    val tMax = Math.ceil(temps.maxOrNull() ?: 10.0)
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("Tage im Überblick", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Gold, modifier = Modifier.weight(1f))
+                        if (shown.size > 1) Text("← wischen →", fontSize = 12.sp, color = Muted)
+                    }
+                    DayPager(shown.size, pf.todayIndex.coerceIn(0, shown.size - 1)) { i ->
+                        val frac = if (shown.size > 1) i / (shown.size - 1f) else 0f
+                        val col = if (i < pf.todayIndex) androidx.compose.ui.graphics.lerp(Panel2, Color(0xFF3F7F68), 0.5f)
+                        else androidx.compose.ui.graphics.lerp(TileToday, Color(0xFFF5C77E), ((i - pf.todayIndex) / (shown.size - 1 - pf.todayIndex).coerceAtLeast(1).toFloat()))
+                        DayCard(pf, i, topW, stepW, tMin, tMax, col)
+                    }
+                }
+
+                val ys = sel.mapNotNull { p -> vm.years[p.id]?.let { p to it } }
+                if (ys.isNotEmpty()) {
+                    val kwpSum = ys.sumOf { it.first.kwp }
+                    val weighted = (0 until 12).map { m -> ys.sumOf { it.second.perKwp[m] * it.first.kwp } / kwpSum }
+                    val ytds = ys.map { vm.ytd[it.first.id] }
+                    val marks = if (ytds.all { it != null }) (0 until 12).map { m -> ys.indices.sumOf { k -> ytds[k]!!.perKwp[m] * ys[k].first.kwp } } else null
+                    YearCard(kwpSum, YearData(weighted, ys.first().second.label), marks)
+                }
+
+                vm.mixSeries[0]?.let { GridNowCard(it) }
+                MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed) { vm.selectMix(it) }
                 SectionCard(
                     title = "Bewölkung und Temperatur",
                     bg = TileTomorrow,
@@ -457,37 +488,6 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Text("Tippe oder wische ins Diagramm für Details.", fontSize = 11.5.sp, color = WarmMuted)
                 }
 
-                val pf = full ?: forecast
-                val shown = (0 until pf.days.size).toList()
-                if (shown.isNotEmpty()) {
-                    val maxP = pf.hours.maxOfOrNull { it.power } ?: 0.0
-                    val (stepW, topW) = Calc.niceScale(maxP, doubleArrayOf(100.0, 200.0, 250.0, 500.0, 1000.0, 2000.0, 2500.0, 5000.0, 10000.0), 3)
-                    val temps = shown.flatMap { k -> pf.hours.subList(pf.days[k].start, minOf(pf.days[k].end, pf.hours.size)).map { it.temp } }
-                    val tMin = Math.floor(temps.minOrNull() ?: 0.0)
-                    val tMax = Math.ceil(temps.maxOrNull() ?: 10.0)
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text("Tage im Überblick", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Gold, modifier = Modifier.weight(1f))
-                        if (shown.size > 1) Text("← wischen →", fontSize = 12.sp, color = Muted)
-                    }
-                    DayPager(shown.size, pf.todayIndex.coerceIn(0, shown.size - 1)) { i ->
-                        val frac = if (shown.size > 1) i / (shown.size - 1f) else 0f
-                        val col = if (i < pf.todayIndex) androidx.compose.ui.graphics.lerp(Panel2, Color(0xFF3F7F68), 0.5f)
-                        else androidx.compose.ui.graphics.lerp(TileToday, Color(0xFFF5C77E), ((i - pf.todayIndex) / (shown.size - 1 - pf.todayIndex).coerceAtLeast(1).toFloat()))
-                        DayCard(pf, i, topW, stepW, tMin, tMax, col)
-                    }
-                }
-
-                val ys = sel.mapNotNull { p -> vm.years[p.id]?.let { p to it } }
-                if (ys.isNotEmpty()) {
-                    val kwpSum = ys.sumOf { it.first.kwp }
-                    val weighted = (0 until 12).map { m -> ys.sumOf { it.second.perKwp[m] * it.first.kwp } / kwpSum }
-                    val ytds = ys.map { vm.ytd[it.first.id] }
-                    val marks = if (ytds.all { it != null }) (0 until 12).map { m -> ys.indices.sumOf { k -> ytds[k]!!.perKwp[m] * ys[k].first.kwp } } else null
-                    YearCard(kwpSum, YearData(weighted, ys.first().second.label), marks)
-                }
-
-                vm.mixSeries[0]?.let { GridNowCard(it) }
-                MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed) { vm.selectMix(it) }
                 vm.selected?.let { sp -> ProfileCard(vm.profile[sp.id], vm.profileFailed, sp.lat, sp.lon) }
 
                 SectionCard(title = "Tabelle", bg = TileTomorrow, borderColor = Color(0xFFE8A060), mutedColor = WarmMuted) {
