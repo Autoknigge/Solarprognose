@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -376,6 +377,30 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
             }
         }
         MIX_GROUPS_UI.forEach { bar(it, it) }
+        if (series.v.containsKey("PumpLaden")) {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
+            val scaleGw = (top / 100.0 * prod / 1000.0).coerceAtLeast(0.5)
+            @Composable fun storage(label: String, load: String, give: String, color: Color) {
+                val l = avg(load) / 1000.0
+                val gv = avg(give) / 1000.0
+                Row(Modifier.fillMaxWidth().padding(top = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(label, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
+                    Row(Modifier.weight(0.66f).height(16.dp)) {
+                        Box(Modifier.weight(0.5f).fillMaxHeight(), contentAlignment = androidx.compose.ui.Alignment.CenterEnd) {
+                            if (l > 0.005) Box(Modifier.fillMaxWidth((l / scaleGw * 0.78).toFloat().coerceIn(0.01f, 1f)).height(14.dp).background(color))
+                        }
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(Color(0xFF6A6A6A)))
+                        Box(Modifier.weight(0.5f).fillMaxHeight(), contentAlignment = androidx.compose.ui.Alignment.CenterStart) {
+                            if (gv > 0.005) Box(Modifier.fillMaxWidth((gv / scaleGw * 0.78).toFloat().coerceIn(0.01f, 1f)).height(14.dp).background(color))
+                        }
+                    }
+                }
+                Text("laden " + Calc.fmt2(l) + " GW · abgeben " + Calc.fmt2(gv) + " GW", fontSize = 11.5.sp, color = LocalMuted.current, modifier = Modifier.padding(start = 0.dp))
+            }
+            storage("Pumpspeicher", "PumpLaden", "PumpAbgabe", Color(0xFF7FA6D9))
+            storage("Batteriespeicher", "BattLaden", "BattAbgabe", Color(0xFFB07CD8))
+            Text("Speicher: links Laden (Verbrauch), rechts Abgabe. Die Abgabe ist in „Sonstige“ enthalten.", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
+        }
         if (series.hasTrade) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
             bar("Import", "Import", true)

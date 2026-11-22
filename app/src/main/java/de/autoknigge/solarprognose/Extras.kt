@@ -288,7 +288,7 @@ object Extras {
         val types = o.getJSONArray("production_types")
         val n = t.length()
         if (n == 0) return null
-        val keys = MIX_GROUPS + listOf("Import", "Export", "Braunkohle", "Steinkohle")
+        val keys = MIX_GROUPS + listOf("Import", "Export", "Braunkohle", "Steinkohle", "PumpLaden", "PumpAbgabe", "BattLaden", "BattAbgabe")
         val raw = keys.associateWith { DoubleArray(n) }
         var last = -1
         var haveTrade = false
@@ -309,6 +309,19 @@ object Extras {
                     if (v > 0) raw["Import"]!![i] = v else raw["Export"]!![i] = -v
                 }
                 continue
+            }
+            // Speicher: Laden (negative Werte oder Verbrauchsreihe) getrennt erfassen, Abgabe bleibt wie bisher in "Sonstige"
+            val stor = if (lower.contains("pumped")) "Pump" else if (lower.contains("battery")) "Batt" else null
+            val isCharge = lower.contains("consum") || (lower.contains("charge") && !lower.contains("discharge"))
+            if (stor != null) {
+                for (i in 0 until minOf(n, d.length())) {
+                    if (d.isNull(i)) continue
+                    val v = d.getDouble(i)
+                    if (isCharge) raw[stor + "Laden"]!![i] += Math.abs(v)
+                    else if (v < 0) raw[stor + "Laden"]!![i] += -v
+                    else if (v > 0) raw[stor + "Abgabe"]!![i] += v
+                }
+                if (isCharge) continue
             }
             val g = mixGroup(name) ?: continue
             val a = raw[g]!!
