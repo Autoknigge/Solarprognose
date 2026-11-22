@@ -234,8 +234,8 @@ fun YearCard(kwp: Double, data: YearData, marks: List<Double>? = null) {
         Text(
             if (data.label.contains("Open-Meteo") && yrs != null)
                 "Berechneter Durchschnitt incl. deiner Verschattung und Wechselrichter-Grenze, ohne Schnee, aus Daten der Jahre " +
-                    yrs.groupValues[1] + " bis " + yrs.groupValues[2] + " (Open-Meteo). Erzielt: aus dem Wetter berechnet, nicht gemessen."
-            else data.label + ", ohne Verschattung, Schnee und Wechselrichter-Grenze. Erzielt: aus dem Wetter berechnet, nicht gemessen.",
+                    yrs.groupValues[1] + " bis " + yrs.groupValues[2] + " (Open-Meteo)."
+            else data.label + ", ohne Verschattung, Schnee und Wechselrichter-Grenze.",
             fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
         )
     }
