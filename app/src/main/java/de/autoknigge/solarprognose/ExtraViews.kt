@@ -314,8 +314,17 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
     )
     val zone = remember { ZoneId.of("Europe/Berlin") }
     var sel by remember(series) { mutableStateOf<Int?>(null) }
+    // CO2 je kWh: aus dem Erzeugungsmix mit festen Durchschnittsfaktoren geschätzt (Energy-Charts liefert dafür keine Daten)
+    val co2 = series?.let { sr ->
+        val nn = sr.t.size
+        val si = sel
+        fun a(g: String): Double = if (si != null) sr.v[g]!![si.coerceIn(0, nn - 1)] else sr.v[g]!!.average()
+        val p = MIX_GROUPS_UI.sumOf { a(it) }
+        if (p > 0.0) MIX_GROUPS_UI.sumOf { a(it) * (CO2_G[it] ?: 0.0) } / p else null
+    }
     SectionCard(
         title = "Strommix Deutschland",
+        trailing = co2?.let { c -> { Text("≈ " + Calc.fmt0(c) + " g CO₂/kWh", fontSize = 11.sp, color = Color(0xFF9A9A9A)) } },
         bg = Color.Black, borderColor = Color(0xFF3A3A3A), inkColor = Color(0xFFEDEDED), mutedColor = Color(0xFF9A9A9A), darken = 0f
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -389,11 +398,17 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
                 )
             }
         }
+        Text("CO₂: Schätzung aus dem Erzeugungsmix mit festen Durchschnittswerten je Energieträger, ohne Import. Keine amtliche Messung.", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
         Text("Nettostromerzeugung der öffentlichen Stromversorgung, Anteile an der Erzeugung. Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
     }
 }
 
 private val MIX_GROUPS_UI = Extras.MIX_GROUPS
+
+/** Durchschnittliche Emission in g CO₂ je kWh (Lebenszyklus, Größenordnung nach IPCC/UBA). */
+private val CO2_G = mapOf(
+    "Kohle" to 1000.0, "Erdgas" to 450.0, "Biomasse" to 230.0, "Wind" to 12.0, "Wasserkraft" to 24.0, "Solar" to 45.0, "Sonstige" to 500.0
+)
 
 /** Anteil von Solar und Erneuerbaren am aktuellen Strombedarf in Deutschland (Energy-Charts). */
 @Composable
