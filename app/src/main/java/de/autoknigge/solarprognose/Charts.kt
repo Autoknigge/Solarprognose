@@ -114,7 +114,7 @@ fun HourlyChart(
 
         var maxP = 0.0
         for (i in 1 until n) maxP = maxOf(maxP, f.hours[i].power)
-        val (step, top) = Calc.niceScale(maxP, doubleArrayOf(100.0, 200.0, 250.0, 500.0, 1000.0, 2000.0, 2500.0), 5)
+        val (step, top) = Calc.niceScale(maxP, doubleArrayOf(100.0, 200.0, 250.0, 500.0, 1000.0, 2000.0, 2500.0, 5000.0, 10000.0), 4)
 
         fun xOf(c: Double): Float = ml + (c / n * iw).toFloat()
         fun yOf(v: Double): Float = mt + ih - (v / top * ih).toFloat()
@@ -354,7 +354,7 @@ fun MonthChart(
             val mk = marks?.getOrNull(k)?.takeIf { k <= currentMonth }
             val y = base - (v / (maxV * 1.12) * ih).toFloat()
             val bh = base - y
-            val c0 = if (k == currentMonth) TodayOrange else androidx.compose.ui.graphics.lerp(GoldDark, GoldLight, k / (n - 1f))
+            val c0 = if (k == currentMonth) TodayOrange else Color(0xFF6CC57F)
             val c = if (selected == null || selected == k) c0 else c0.copy(alpha = 0.55f)
             if (bh > 0.5f) {
                 val r = minOf(3.dp.toPx(), bh / 2)
@@ -372,13 +372,13 @@ fun MonthChart(
                 drawPath(path, color = c)
             }
             // Prognosewert rot (im aktuellen Monat weiß auf Orange), alle auf gleicher Höhe unten im Balken
-            nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", v), cx, base - 5.dp.toPx(), if (k == currentMonth) whitePaint else redPaint)
+            nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", v), cx, base - 5.dp.toPx() - (if (k % 2 == 1) 13.dp.toPx() else 0f), whitePaint)
             // Strich: Stand der Erzeugung (schwarz innerhalb der Prognose, orange darüber), Zahl in Orange oben
             if (mk != null) {
                 val ym = base - (mk / (maxV * 1.12) * ih).toFloat()
                 val col = if (mk <= v) Color.Black else Color(0xFFFF9A2E)
                 drawLine(col, Offset(x - 2.dp.toPx(), ym), Offset(x + bw + 2.dp.toPx(), ym), strokeWidth = 1.5.dp.toPx())
-                nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", mk), cx, minOf(y, ym) - 5.dp.toPx(), orangePaint)
+                nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", mk), cx, minOf(y, ym) - 5.dp.toPx() - (if (k % 2 == 1) 13.dp.toPx() else 0f), orangePaint)
             }
             nativeCanvas.drawText(MONTHS[k], cx, base + 15.dp.toPx(), if (k == currentMonth) paints.dayToday else paints.tickCenter)
         }
