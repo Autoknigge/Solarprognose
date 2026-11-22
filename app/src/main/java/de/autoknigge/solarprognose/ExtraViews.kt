@@ -214,10 +214,25 @@ fun YearCard(kwp: Double, data: YearData, marks: List<Double>? = null) {
                 )
             } else {
                 Text("ca. " + Calc.fmt0(total) + " kWh pro Jahr", fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp)
-                if (ytdSum != null) Text(
-                    "Erzielt " + today.year + ": " + Calc.fmt0(ytdSum) + " kWh · " + Calc.fmt0(if (total > 0) ytdSum / total * 100.0 else 0.0) + " % der Prognose erreicht",
-                    fontSize = 12.5.sp, color = Color(0xFFFF9A2E), lineHeight = 17.sp
-                )
+                if (ytdSum != null && total > 0) {
+                    val mi = today.monthValue - 1
+                    val frac = ((today.dayOfMonth - 1) + java.time.LocalTime.now().hour / 24.0) / YearMonth.of(today.year, mi + 1).lengthOfMonth()
+                    val expected = months.take(mi).sum() + months[mi] * frac
+                    val left = (total - ytdSum).coerceAtLeast(0.0)
+                    Text(
+                        "Erzielt " + today.year + ": " + Calc.fmt0(ytdSum) + " kWh (" + Calc.fmt0(ytdSum / total * 100.0) + " % der Jahresprognose, " +
+                            (if (left > 0) "noch " + Calc.fmt0(left / total * 100.0) + " % = " + Calc.fmt0(left) + " kWh bis Jahresende)" else "Jahresprognose erreicht)"),
+                        fontSize = 12.5.sp, color = Color(0xFFFF9A2E), lineHeight = 17.sp
+                    )
+                    if (expected > 0) {
+                        val dev = (ytdSum / expected - 1.0) * 100.0
+                        Text(
+                            "Bis heute erwartet: " + Calc.fmt0(expected) + " kWh · " +
+                                (if (dev >= 0) Calc.fmt0(dev) + " % vor der Prognose" else Calc.fmt0(-dev) + " % hinter der Prognose"),
+                            fontSize = 12.5.sp, color = Color.White, lineHeight = 17.sp
+                        )
+                    }
+                }
             }
             if (marks != null) Text(
                 androidx.compose.ui.text.buildAnnotatedString {
