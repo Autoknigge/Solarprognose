@@ -313,7 +313,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
         "Import" to Color(0xFF5FD0E6), "Export" to Color(0xFFE8607A)
     )
     val zone = remember { ZoneId.of("Europe/Berlin") }
-    var sel by remember(series) { mutableStateOf<Int?>(null) }
+    var sel by remember(series) { mutableStateOf<Int?>(series?.t?.let { it.size - 1 }) }
     // CO2 je kWh: aus dem Erzeugungsmix mit festen Durchschnittsfaktoren geschätzt (Energy-Charts liefert dafür keine Daten)
     val co2 = series?.let { sr ->
         val nn = sr.t.size
@@ -352,7 +352,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
         val first = fmt(series.t[0], false)
         val lastT = series.t[n - 1]
         val head = if (s != null) {
-            fmt(series.t[s.coerceIn(0, n - 1)], range != 2)
+            (if (s >= n - 1 && range != 2) "Aktuell " else "") + fmt(series.t[s.coerceIn(0, n - 1)], range != 2)
         } else when (range) {
             0 -> "Heute bis " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(lastT + 900).atZone(zone).hour, Instant.ofEpochSecond(lastT + 900).atZone(zone).minute)
             else -> "Durchschnitt $first bis ${fmt(lastT, false)}"
@@ -378,8 +378,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
             bar("Export", "Export", true)
             val net = (avg("Import") - avg("Export")) / 1000.0
             Text(
-                (if (net >= 0) "Netto-Import " else "Netto-Export ") + Calc.fmt2(Math.abs(net)) + " GW (Import " + Calc.fmt2(avg("Import") / 1000.0) +
-                    " minus Export " + Calc.fmt2(avg("Export") / 1000.0) + ")",
+                (if (net >= 0) "Netto-Import (Import-Export) " else "Netto-Export (Export-Import) ") + Calc.fmt2(Math.abs(net)) + " GW",
                 fontSize = 12.sp, color = LocalMuted.current
             )
         }
@@ -392,7 +391,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
             )
             Row(Modifier.fillMaxWidth()) {
                 Text(
-                    if (s == null) "Schieber: einzelnen Zeitpunkt wählen" else "Zurück zur Gesamtansicht",
+                    if (s == null) "Schieber: einzelnen Zeitpunkt wählen" else "Durchschnitt der Ansicht anzeigen",
                     fontSize = 12.sp, color = if (s == null) LocalMuted.current else Color(0xFFE3B341),
                     modifier = if (s == null) Modifier else Modifier.clickable { sel = null }
                 )
