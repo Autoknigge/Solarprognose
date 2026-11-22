@@ -214,10 +214,10 @@ fun YearCard(kwp: Double, data: YearData, marks: List<Double>? = null) {
             },
             fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp
         )
-        if (marks != null) Text("▇ Prognose je Monat   ━ Strich: dieses Jahr bisher erreicht", fontSize = 11.5.sp, color = Muted)
+        if (marks != null) Text("Orange: dieses Jahr erreicht · schwarzer Strich: Prognose · weiß: Prognosewert", fontSize = 11.5.sp, color = Muted)
         MonthChart(values = months, currentMonth = today.monthValue - 1, selected = sel, onSelect = { sel = it }, marks = marks)
         Text(
-            data.label + ", kein Wert für ein einzelnes Jahr. Der Strich zeigt die Werte dieses Jahres, aus dem Wetter berechnet (nicht gemessen). " +
+            data.label + ", kein Wert für ein einzelnes Jahr. Die Balken zeigen die Werte dieses Jahres, aus dem Wetter berechnet (nicht gemessen). " +
                 (if (data.label.contains("Open-Meteo")) "Mit deiner Verschattung und Wechselrichter-Grenze, ohne Schnee." else "Ohne Verschattung, Schnee und Wechselrichter-Grenze."),
             fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
         )
@@ -449,6 +449,7 @@ fun DayCard(f: Forecast, k: Int, topW: Double, stepW: Double, tMin: Double, tMax
                 isAntiAlias = true; color = tempCol.toArgb(); textSize = with(density) { 10.5.sp.toPx() }; isFakeBoldText = true
             }
         }
+        var selH by remember(k) { mutableStateOf<Int?>(null) }
         Canvas(Modifier.fillMaxWidth().height(180.dp)) {
             val w = size.width
             val h = size.height
@@ -511,6 +512,35 @@ fun DayCard(f: Forecast, k: Int, topW: Double, stepW: Double, tMin: Double, tMax
                 if (tf) { tl.moveTo(px, py); tf = false } else tl.lineTo(px, py)
             }
             if (!tf) drawPath(tl, color = tempCol, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 6f))))
+            selH?.let { o ->
+                if (o in lo..hi && o < hs.size) {
+                    val px = xOf(o)
+                    drawLine(ink, Offset(px, mt), Offset(px, mt + ih), strokeWidth = 1.5.dp.toPx())
+                    drawCircle(ink, 4.dp.toPx(), Offset(px, yP(hs[o].power)))
+                }
+            }
+        }
+        val sLo = 4
+        val sHi = minOf(22, hs.size - 1)
+        if (sHi > sLo) {
+            val pk = hs.indexOfFirst { it.hour == d.peakHour }.coerceIn(sLo, sHi)
+            androidx.compose.material3.Slider(
+                value = (selH ?: pk).toFloat(),
+                onValueChange = { selH = Math.round(it).coerceIn(sLo, sHi) },
+                valueRange = sLo.toFloat()..sHi.toFloat(),
+                steps = sHi - sLo - 1,
+                colors = androidx.compose.material3.SliderDefaults.colors(
+                    thumbColor = ink, activeTrackColor = ink, inactiveTrackColor = muted.copy(alpha = 0.35f),
+                    activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent
+                )
+            )
+            val sh = selH?.let { hs.getOrNull(it) }
+            Text(
+                if (sh != null) (sh.hour - 1).toString() + "–" + sh.hour + " Uhr · " + Calc.fmt2(sh.power / 1000.0) + " kW · " + Calc.fmt0(sh.temp) + " °C · Wolken " + Calc.fmt0(sh.cloud) + " %" +
+                    (if (sh.precip >= 0.1) " · Regen " + Calc.fmt1(sh.precip) + " mm" else "")
+                else "Schieber: einzelne Stunde anzeigen",
+                fontSize = 12.sp, color = muted, lineHeight = 16.sp
+            )
         }
     }
 }

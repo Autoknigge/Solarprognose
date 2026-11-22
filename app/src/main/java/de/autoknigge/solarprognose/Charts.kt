@@ -308,6 +308,12 @@ fun MonthChart(
     val density = LocalDensity.current
     val paints = remember(density) { ChartPaints(with(density) { 10.sp.toPx() }, with(density) { 10.5.sp.toPx() }) }
     val n = values.size
+    val whitePaint = remember(density) {
+        android.graphics.Paint().apply { isAntiAlias = true; color = 0xFFFFFFFF.toInt(); textSize = with(density) { 9.5.sp.toPx() }; textAlign = android.graphics.Paint.Align.CENTER; isFakeBoldText = true }
+    }
+    val orangePaint = remember(density) {
+        android.graphics.Paint().apply { isAntiAlias = true; color = 0xFFFF9A2E.toInt(); textSize = with(density) { 10.5.sp.toPx() }; textAlign = android.graphics.Paint.Align.CENTER; isFakeBoldText = true }
+    }
 
     fun monthAt(x: Float, width: Float, m: Float): Int {
         val band = (width - 2 * m) / n
@@ -342,10 +348,14 @@ fun MonthChart(
         values.forEachIndexed { k, v ->
             val cx = m + band * (k + 0.5f)
             val x = cx - bw / 2
-            val y = base - (v / (maxV * 1.12) * ih).toFloat()
+            val mk = marks?.getOrNull(k)?.takeIf { k <= currentMonth }
+            // Balken: mit Daten dieses Jahres bis zum erreichten Wert, sonst (Zukunft) die Prognose, etwas blasser
+            val bv = mk ?: v
+            val y = base - (bv / (maxV * 1.12) * ih).toFloat()
             val bh = base - y
             val c0 = if (k == currentMonth) TodayOrange else androidx.compose.ui.graphics.lerp(GoldDark, GoldLight, k / (n - 1f))
-            val c = if (selected == null || selected == k) c0 else c0.copy(alpha = 0.55f)
+            val dim = if (mk == null && marks != null) 0.5f else 1f
+            val c = c0.copy(alpha = (if (selected == null || selected == k) 1f else 0.55f) * dim)
             if (bh > 0.5f) {
                 val r = minOf(3.dp.toPx(), bh / 2)
                 val path = Path().apply {
@@ -361,15 +371,18 @@ fun MonthChart(
                 }
                 drawPath(path, color = c)
             }
-            nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", v), cx, minOf(y, base - 2.dp.toPx()) - 5.dp.toPx(), paints.barLabel)
-            nativeCanvas.drawText(MONTHS[k], cx, base + 15.dp.toPx(), if (k == currentMonth) paints.dayToday else paints.tickCenter)
-            // Strich: bisher erreicht (dieses Jahr)
-            val mk = marks?.getOrNull(k)
-            if (mk != null && k <= currentMonth) {
-                val ym = base - (mk / (maxV * 1.12) * ih).toFloat()
-                drawLine(Color.White, Offset(x - 3.dp.toPx(), ym), Offset(x + bw + 3.dp.toPx(), ym), strokeWidth = 5.dp.toPx())
-                drawLine(Color(0xFF0E2F4F), Offset(x - 3.dp.toPx(), ym), Offset(x + bw + 3.dp.toPx(), ym), strokeWidth = 3.dp.toPx())
+            // Prognose: dünner schwarzer Strich
+            var top = y
+            if (mk != null) {
+                val yf = base - (v / (maxV * 1.12) * ih).toFloat()
+                drawLine(Color.Black, Offset(x - 2.dp.toPx(), yf), Offset(x + bw + 2.dp.toPx(), yf), strokeWidth = 1.dp.toPx())
+                top = minOf(y, yf)
             }
+            // Prognosewert weiß, alle auf gleicher Höhe unten
+            nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", v), cx, base - 5.dp.toPx(), whitePaint)
+            // Erreichter Wert dieses Jahres oben in Orange
+            if (mk != null) nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", mk), cx, top - 5.dp.toPx(), orangePaint)
+            nativeCanvas.drawText(MONTHS[k], cx, base + 15.dp.toPx(), if (k == currentMonth) paints.dayToday else paints.tickCenter)
         }
     }
 }
