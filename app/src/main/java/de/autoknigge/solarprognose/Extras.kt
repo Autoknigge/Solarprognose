@@ -40,7 +40,15 @@ object Extras {
 
     private fun prefs(ctx: Context) = ctx.applicationContext.getSharedPreferences("extras", Context.MODE_PRIVATE)
 
-    private fun yearSig(p: Plant) = "${p.lat},${p.lon},${p.tilt},${p.az},${p.eff}"
+    private fun yearSig(p: Plant) = "${p.lat},${p.lon},${p.tilt},${p.az},${p.eff},${p.kwp},${p.limitW},${p.shades}"
+
+    /** Wh je kWp und Stunde, gleiches Modell wie die Prognose: Verschattung, Temperatur, Wirkungsgrad, Wechselrichter-Grenze. */
+    private fun whPerKwp(p: Plant, g: Double, t: Double, date: String, hour: Int): Double {
+        val gs = g * Calc.shadeFactor(p.shades, date, hour)
+        var w = gs * (1.0 - 0.004 * (t + gs * 0.031 - 25.0)) * (p.eff / 100.0)
+        if (p.limitW > 0 && p.kwp > 0.0) w = minOf(w, p.limitW / p.kwp)
+        return maxOf(0.0, w)
+    }
 
     // ---------- Wettersymbol ----------
 
@@ -112,9 +120,9 @@ object Extras {
             if (gti.isNull(i)) continue
             val g = gti.getDouble(i).coerceAtLeast(0.0)
             val t = if (tmp.isNull(i)) 10.0 else tmp.getDouble(i)
-            val w = g * (1.0 - 0.004 * (t + g * 0.031 - 25.0)) * (p.eff / 100.0) // Watt je kWp
             val ts = time.getString(i) // 2024-05-17T13:00
-            sums.getOrPut(ts.substring(0, 4).toInt()) { DoubleArray(12) }[ts.substring(5, 7).toInt() - 1] += w.coerceAtLeast(0.0)
+            val w = whPerKwp(p, g, t, ts.substring(0, 10), ts.substring(11, 13).toInt())
+            sums.getOrPut(ts.substring(0, 4).toInt()) { DoubleArray(12) }[ts.substring(5, 7).toInt() - 1] += w
         }
         val full = sums.filterValues { it.sum() > 0.0 }
         if (full.size < 3) throw IllegalStateException("zu wenig Jahre")
@@ -452,8 +460,8 @@ object Extras {
                 if (nowKey != null && ts.substring(0, 13) > nowKey) continue
                 val g = gti.getDouble(i).coerceAtLeast(0.0)
                 val t = if (tmp.isNull(i)) 10.0 else tmp.getDouble(i)
-                val w = g * (1.0 - 0.004 * (t + g * 0.031 - 25.0)) * (p.eff / 100.0)
-                sums[ts.substring(5, 7).toInt() - 1] += w.coerceAtLeast(0.0)
+                val w = whPerKwp(p, g, t, d, ts.substring(11, 13).toInt())
+                sums[ts.substring(5, 7).toInt() - 1] += w
                 if (d > last) last = d
             }
         }

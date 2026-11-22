@@ -217,7 +217,8 @@ fun YearCard(kwp: Double, data: YearData, marks: List<Double>? = null) {
         if (marks != null) Text("▇ Prognose je Monat   ━ Strich: dieses Jahr bisher erreicht", fontSize = 11.5.sp, color = Muted)
         MonthChart(values = months, currentMonth = today.monthValue - 1, selected = sel, onSelect = { sel = it }, marks = marks)
         Text(
-            data.label + ", kein Wert für ein einzelnes Jahr. Der Strich zeigt die Werte dieses Jahres, aus dem Wetter berechnet (nicht gemessen). Ohne Verschattung, Schnee und Wechselrichter-Grenze.",
+            data.label + ", kein Wert für ein einzelnes Jahr. Der Strich zeigt die Werte dieses Jahres, aus dem Wetter berechnet (nicht gemessen). " +
+                (if (data.label.contains("Open-Meteo")) "Mit deiner Verschattung und Wechselrichter-Grenze, ohne Schnee." else "Ohne Verschattung, Schnee und Wechselrichter-Grenze."),
             fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
         )
     }
