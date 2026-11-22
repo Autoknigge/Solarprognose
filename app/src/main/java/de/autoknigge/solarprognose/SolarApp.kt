@@ -7,6 +7,7 @@ import android.content.ComponentName
 class SolarApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        CrashLog.install(this)
         createNotificationChannel(this)
         val store = Store(this)
         if (store.notifyOn) Scheduler.scheduleDaily(this, store.notifyHour)
