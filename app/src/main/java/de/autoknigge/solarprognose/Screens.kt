@@ -480,6 +480,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                 }
 
+                if (vm.selectedId != null) ProfileCard(vm.selectedId?.let { vm.profile[it] }, vm.profileFailed)
                 vm.prices?.let { pr -> if (pr.isNotEmpty()) PriceCard(pr, nowSec) }
                 vm.mixSeries[0]?.let { GridNowCard(it) }
                 MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed) { vm.selectMix(it) }

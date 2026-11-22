@@ -393,4 +393,37 @@ object Extras {
         if (s != null) synchronized(mixCache) { mixCache[range] = System.currentTimeMillis() to s }
         s
     }
+
+    private val profileCache = HashMap<String, Pair<Long, ProfileData>>()
+
+    fun parseProfile(json: String): ProfileData {
+        val o = JSONObject(json)
+        val h = o.getJSONObject("hourly")
+        val t = h.getJSONArray("time")
+        val n = t.length()
+        fun arr(name: String): DoubleArray {
+            val a = h.optJSONArray(name) ?: return DoubleArray(n) { Double.NaN }
+            return DoubleArray(n) { i -> if (a.isNull(i)) Double.NaN else a.getDouble(i) }
+        }
+        val levels = listOf(1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150)
+        val ccs = levels.map { arr("cloud_cover_" + it + "hPa") }
+        val ghs = levels.map { arr("geopotential_height_" + it + "hPa") }
+        return ProfileData(
+            timezone = o.optString("timezone", "Europe/Berlin"),
+            time = List(n) { t.getString(it) },
+            levels = levels,
+            cc = List(n) { i -> DoubleArray(levels.size) { k -> ccs[k][i] } },
+            gh = List(n) { i -> DoubleArray(levels.size) { k -> ghs[k][i] } },
+            low = arr("cloud_cover_low"), mid = arr("cloud_cover_mid"), high = arr("cloud_cover_high"),
+            rain = arr("precipitation")
+        )
+    }
+
+    suspend fun loadProfile(p: Plant): ProfileData = withContext(Dispatchers.IO) {
+        val key = p.lat.toString() + "/" + p.lon
+        synchronized(profileCache) { profileCache[key] }?.let { if (System.currentTimeMillis() - it.first < 30L * 60 * 1000) return@withContext it.second }
+        val d = parseProfile(Api.profileJson(p))
+        synchronized(profileCache) { profileCache[key] = System.currentTimeMillis() to d }
+        d
+    }
 }

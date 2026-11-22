@@ -42,6 +42,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Börsenpreise ab heute, falls geladen. */
     var prices by mutableStateOf<List<PriceHour>?>(null)
+    var profile by mutableStateOf<Map<String, ProfileData>>(emptyMap())
+        private set
+    var profileFailed by mutableStateOf(false)
+        private set
     var mixRange by mutableStateOf(0)
     var mixSeries by mutableStateOf<Map<Int, MixSeries>>(emptyMap())
     var mixFailed by mutableStateOf<Set<Int>>(emptySet())
@@ -95,6 +99,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 prices = Extras.loadPrices(ctx)
             } catch (e: Exception) {
+            }
+        }
+        selected?.let { p ->
+            viewModelScope.launch {
+                try {
+                    profile = profile + (p.id to Extras.loadProfile(p))
+                    profileFailed = false
+                } catch (e: Exception) {
+                    profileFailed = true
+                }
             }
         }
         loadMixRange(0)

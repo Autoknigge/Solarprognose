@@ -167,3 +167,18 @@ data class GeoPlace(
     val label: String
         get() = (if (post.isNotBlank()) "$post " else "") + listOf(name, admin2, admin1, country).filter { it.isNotBlank() }.distinct().joinToString(", ")
 }
+
+/** Wolkenprofil: Bewölkung je Druckfläche und Stunde, dazu Höhe der Druckflächen, Regen und die drei Wolkenstockwerke. */
+class ProfileData(
+    val timezone: String,
+    val time: List<String>,
+    val levels: List<Int>,
+    val cc: List<DoubleArray>,
+    val gh: List<DoubleArray>,
+    val low: DoubleArray,
+    val mid: DoubleArray,
+    val high: DoubleArray,
+    val rain: DoubleArray
+) {
+    val hasLevels: Boolean get() = cc.any { r -> r.any { !it.isNaN() } } && gh.any { r -> r.any { !it.isNaN() } }
+}

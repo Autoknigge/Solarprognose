@@ -1,6 +1,9 @@
 package de.autoknigge.solarprognose
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.luminance
@@ -511,5 +514,167 @@ fun DayCard(f: Forecast, k: Int, topW: Double, stepW: Double, tMin: Double, tMax
             }
             if (!tf) drawPath(tl, color = tempCol, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 6f))))
         }
+    }
+}
+
+private const val PROFILE_ROWS = 28 // 0 bis 14 km in 500-m-Schritten
+
+private fun profileCloudAt(d: ProfileData, i: Int, hm: Double): Double {
+    if (!d.hasLevels) {
+        val v = if (hm < 2000.0) d.low[i] else if (hm < 6000.0) d.mid[i] else d.high[i]
+        return if (v.isNaN()) 0.0 else v
+    }
+    val g = d.gh[i]
+    val c = d.cc[i]
+    val idx = g.indices.filter { !g[it].isNaN() && !c[it].isNaN() }
+    if (idx.isEmpty()) return 0.0
+    if (hm <= g[idx.first()]) return c[idx.first()]
+    if (hm >= g[idx.last()]) return c[idx.last()]
+    for (k in 0 until idx.size - 1) {
+        val a = idx[k]
+        val b = idx[k + 1]
+        if (hm <= g[b]) {
+            val span = g[b] - g[a]
+            val f = if (span <= 0.0) 0.0 else (hm - g[a]) / span
+            return c[a] + (c[b] - c[a]) * f
+        }
+    }
+    return c[idx.last()]
+}
+
+/** Niederschlag (Balken) und Wolkenprofil von 0 bis 14 km (Wärmebild) auf gemeinsamer Zeitachse. */
+@Composable
+fun ProfileCard(d: ProfileData?, failed: Boolean) {
+    SectionCard(
+        title = "Niederschlag und Wolken",
+        bg = Color.Black, borderColor = Color(0xFF3A3A3A), inkColor = Color(0xFFEDEDED), mutedColor = Color(0xFF9A9A9A), darken = 0f
+    ) {
+        if (d == null || d.time.isEmpty()) {
+            Text(if (failed) "Daten gerade nicht erreichbar." else "Lade Daten …", fontSize = 13.sp, color = LocalMuted.current)
+            return@SectionCard
+        }
+        val n = d.time.size
+        var sel by remember(d) { mutableStateOf<Int?>(null) }
+        val grid = remember(d) { Array(n) { i -> DoubleArray(PROFILE_ROWS) { r -> profileCloudAt(d, i, (r + 0.5) * 500.0) } } }
+        val nowIdx = remember(d) {
+            val z = try { ZoneId.of(d.timezone) } catch (e: Exception) { ZoneId.systemDefault() }
+            val key = java.time.LocalDateTime.now(z).toString().substring(0, 13)
+            d.time.indexOfFirst { it.startsWith(key) }
+        }
+        val rainMax = maxOf(2.0, d.rain.filter { !it.isNaN() }.maxOrNull() ?: 0.0)
+        val rainTotal = d.rain.filter { !it.isNaN() }.sum()
+        val rainColor = Color(0xFF5FB0E6)
+        val lo = Color(0xFF101C2A)
+        val hi = Color(0xFFF4F8FB)
+        val gold = Color(0xFFE3B341)
+
+        Text(
+            "Regen je Stunde (blau, bis " + Calc.fmt0(rainMax) + " mm) · in 5 Tagen insgesamt " + Calc.fmt1(rainTotal) + " mm",
+            fontSize = 12.sp, color = LocalMuted.current
+        )
+        Canvas(
+            Modifier.fillMaxWidth().height(290.dp)
+                .pointerInput(d) {
+                    detectTapGestures { o ->
+                        val lm = 34.dp.toPx()
+                        val w = size.width - lm - 2.dp.toPx()
+                        sel = ((o.x - lm) / (w / n)).toInt().coerceIn(0, n - 1)
+                    }
+                }
+                .pointerInput(d) {
+                    detectHorizontalDragGestures { ch, _ ->
+                        val lm = 34.dp.toPx()
+                        val w = size.width - lm - 2.dp.toPx()
+                        sel = ((ch.position.x - lm) / (w / n)).toInt().coerceIn(0, n - 1)
+                    }
+                }
+        ) {
+            val lm = 34.dp.toPx()
+            val w = size.width - lm - 2.dp.toPx()
+            val colW = w / n
+            val rainH = 56.dp.toPx()
+            val heatTop = rainH + 10.dp.toPx()
+            val heatH = 200.dp.toPx()
+            val axisY = heatTop + heatH
+            val cellH = heatH / PROFILE_ROWS
+            val txt = android.graphics.Paint().apply {
+                isAntiAlias = true
+                color = 0xFF9A9A9A.toInt()
+                textSize = 10.sp.toPx()
+            }
+            // Regen
+            drawLine(Color(0xFF3A3A3A), Offset(lm, rainH), Offset(lm + w, rainH), strokeWidth = 1.dp.toPx())
+            for (i in 0 until n) {
+                val r = d.rain[i]
+                if (r.isNaN() || r <= 0.0) continue
+                val bh = (r / rainMax).toFloat().coerceIn(0f, 1f) * rainH
+                drawRect(rainColor, Offset(lm + i * colW, rainH - bh), Size(maxOf(colW - 0.6f, 1f), bh))
+            }
+            // Wolken-Wärmebild
+            for (i in 0 until n) {
+                for (r in 0 until PROFILE_ROWS) {
+                    val v = (grid[i][r] / 100.0).toFloat().coerceIn(0f, 1f)
+                    val col = androidx.compose.ui.graphics.lerp(lo, hi, Math.pow(v.toDouble(), 0.85).toFloat())
+                    drawRect(col, Offset(lm + i * colW, axisY - (r + 1) * cellH), Size(colW + 0.6f, cellH + 0.6f))
+                }
+            }
+            // Höhenachse
+            txt.textAlign = android.graphics.Paint.Align.RIGHT
+            for (km in 0..14 step 2) {
+                val y = axisY - km * 2 * cellH
+                drawLine(Color(0x55FFFFFF), Offset(lm - 3.dp.toPx(), y), Offset(lm, y), strokeWidth = 1.dp.toPx())
+                drawContext.canvas.nativeCanvas.drawText("$km km", lm - 5.dp.toPx(), y + 3.5.dp.toPx(), txt)
+            }
+            // Tagesgrenzen und Beschriftung
+            txt.textAlign = android.graphics.Paint.Align.CENTER
+            val starts = (0 until n).filter { d.time[it].substring(11, 13) == "00" }
+            val bounds = (if (starts.firstOrNull() != 0) listOf(0) else emptyList()) + starts + n
+            for (k in 0 until bounds.size - 1) {
+                val a = bounds[k]
+                val b = bounds[k + 1]
+                if (a > 0) {
+                    val x = lm + a * colW
+                    drawLine(Color(0x66FFFFFF), Offset(x, 0f), Offset(x, axisY), strokeWidth = 1.dp.toPx())
+                }
+                if (b - a >= 6) {
+                    val dt = d.time[a].substring(0, 10)
+                    drawContext.canvas.nativeCanvas.drawText(Calc.weekday(dt) + " " + Calc.dm(dt), lm + (a + b) / 2f * colW, axisY + 15.dp.toPx(), txt)
+                }
+            }
+            // Jetzt
+            if (nowIdx >= 0) {
+                val x = lm + (nowIdx + 0.5f) * colW
+                drawLine(gold, Offset(x, 0f), Offset(x, axisY), strokeWidth = 1.5.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 6f)))
+            }
+            // Auswahl
+            sel?.let { s ->
+                val x = lm + (s + 0.5f) * colW
+                drawLine(Color.White, Offset(x, 0f), Offset(x, axisY), strokeWidth = 1.5.dp.toPx())
+            }
+        }
+        val s = sel
+        if (s != null) {
+            val t = d.time[s]
+            val r = d.rain[s]
+            Text(
+                Calc.weekday(t.substring(0, 10)) + " " + Calc.dm(t.substring(0, 10)) + " " + t.substring(11, 13) + " Uhr · Regen " +
+                    (if (r.isNaN()) "–" else Calc.fmt1(r) + " mm") + " · Wolken tief " + (if (d.low[s].isNaN()) "–" else Calc.fmt0(d.low[s]) + " %") +
+                    ", mittel " + (if (d.mid[s].isNaN()) "–" else Calc.fmt0(d.mid[s]) + " %") +
+                    ", hoch " + (if (d.high[s].isNaN()) "–" else Calc.fmt0(d.high[s]) + " %"),
+                fontSize = 12.sp, color = LocalInk.current
+            )
+        } else {
+            Text("Antippen oder wischen für Einzelwerte. Gold gestrichelt: jetzt.", fontSize = 12.sp, color = LocalMuted.current)
+        }
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("klar", fontSize = 11.sp, color = LocalMuted.current)
+            Box(Modifier.size(width = 120.dp, height = 10.dp).background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(lo, hi))))
+            Text("bedeckt", fontSize = 11.sp, color = LocalMuted.current)
+        }
+        Text(
+            if (d.hasLevels) "Wolkenanteil je Höhe aus den Druckflächen-Daten des Wettermodells, Höhen gerechnet. Quelle: Open-Meteo.com (CC BY 4.0)"
+            else "Höhendaten gerade nicht verfügbar: vereinfachte Darstellung mit tiefen, mittleren und hohen Wolken. Quelle: Open-Meteo.com (CC BY 4.0)",
+            fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp
+        )
     }
 }

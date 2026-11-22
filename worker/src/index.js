@@ -86,6 +86,26 @@ async function forecast(url, env, ctx) {
   });
 }
 
+const PROFILE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150];
+
+// Wolkenprofil und Regen: Bewölkung und Höhe je Druckfläche, dazu tiefe/mittlere/hohe Wolken.
+async function profile(url, env, ctx) {
+  let lat = num(url, "latitude");
+  let lon = num(url, "longitude");
+  if (![lat, lon].every(Number.isFinite)) return json({ error: "bad_params" }, 400);
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return json({ error: "bad_coordinates" }, 400);
+  lat = Math.round(lat * 100) / 100;
+  lon = Math.round(lon * 100) / 100;
+  const vars = [
+    "precipitation", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
+    ...PROFILE_LEVELS.map((l) => `cloud_cover_${l}hPa`),
+    ...PROFILE_LEVELS.map((l) => `geopotential_height_${l}hPa`),
+  ].join(",");
+  return cached(ctx, `https://cache.invalid/profile/${lat}/${lon}`, FORECAST_TTL, () =>
+    upstream(openMeteo(env, "api", `latitude=${lat}&longitude=${lon}&hourly=${vars}&forecast_days=5&timezone=auto`))
+  );
+}
+
 // Langzeit-Monatserträge je kWp von PVGIS (Europäische Kommission, JRC). Die App rechnet mit der Modulleistung hoch.
 async function yearly(url, ctx) {
   let lat = num(url, "latitude");
@@ -143,6 +163,7 @@ export default {
     }
     const url = new URL(request.url);
     if (url.pathname === "/forecast") return forecast(url, env, ctx);
+    if (url.pathname === "/profile") return profile(url, env, ctx);
     if (url.pathname === "/search") return search(url, env, ctx);
     if (url.pathname === "/yearly") return yearly(url, ctx);
     if (url.pathname === "/prices") return prices(url, ctx);
