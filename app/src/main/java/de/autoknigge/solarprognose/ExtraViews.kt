@@ -404,9 +404,9 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
 
 private val MIX_GROUPS_UI = Extras.MIX_GROUPS
 
-/** Durchschnittliche Emission in g CO₂ je kWh (Lebenszyklus, Größenordnung nach IPCC/UBA). */
+/** Durchschnittliche Emission in g CO₂ je kWh (Lebenszyklus inkl. Vorkette, Deutschland; Kohle = Mittel aus Braun- und Steinkohle nach Strommengen 2025). */
 private val CO2_G = mapOf(
-    "Kohle" to 1000.0, "Erdgas" to 450.0, "Biomasse" to 230.0, "Wind" to 12.0, "Wasserkraft" to 24.0, "Solar" to 45.0, "Sonstige" to 500.0
+    "Kohle" to 1065.0, "Erdgas" to 460.0, "Biomasse" to 290.0, "Wind" to 12.0, "Wasserkraft" to 12.0, "Solar" to 56.0, "Sonstige" to 500.0
 )
 
 /** Anteil von Solar und Erneuerbaren am aktuellen Strombedarf in Deutschland (Energy-Charts). */
