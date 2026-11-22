@@ -488,7 +488,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
 
                 vm.mixSeries[0]?.let { GridNowCard(it) }
                 MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed) { vm.selectMix(it) }
-                if (vm.selectedId != null) ProfileCard(vm.selectedId?.let { vm.profile[it] }, vm.profileFailed)
+                vm.selected?.let { sp -> ProfileCard(vm.profile[sp.id], vm.profileFailed, sp.lat, sp.lon) }
 
                 SectionCard(title = "Tabelle", bg = TileTomorrow, borderColor = Color(0xFFE8A060), mutedColor = WarmMuted) {
                     Row(Modifier.fillMaxWidth()) {

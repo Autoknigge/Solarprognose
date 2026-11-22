@@ -224,9 +224,9 @@ object Calc {
     }
 
     /** Sonnenaufgang und -untergang (Ortszeit, "HH:mm") nach dem NOAA-Verfahren; null bei Polartag/-nacht. */
-    fun sunTimes(lat: Double, lon: Double, timezone: String): Pair<String, String>? {
+    fun sunTimes(lat: Double, lon: Double, timezone: String, onDate: LocalDate? = null): Pair<String, String>? {
         val zone = try { ZoneId.of(timezone) } catch (e: Exception) { ZoneId.systemDefault() }
-        val date = LocalDate.now(zone)
+        val date = onDate ?: LocalDate.now(zone)
         val g = 2 * Math.PI / 365.0 * (date.dayOfYear - 1 + 0.5)
         val eq = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) -
             0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g))
