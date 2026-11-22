@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
@@ -21,7 +22,9 @@ data class YtdData(val perKwp: List<Double>)
 class MixSeries(
     val t: LongArray, val v: Map<String, DoubleArray>, val hasTrade: Boolean,
     /** Anteil von Solar und von allen Erneuerbaren am aktuellen Strombedarf (%), mit Zeitpunkt in Sekunden. */
-    val solarShare: Double? = null, val renShare: Double? = null, val shareT: Long = 0L
+    val solarShare: Double? = null, val renShare: Double? = null, val shareT: Long = 0L,
+    /** Ab diesem Index sind die Werte vorläufig (Solar/Wind aus Prognose, Rest fortgeschrieben); -1 = alles gemessen. */
+    val estFrom: Int = -1
 )
 
 enum class WeatherKind { Sun, SunCloud, Cloud, Rain, Snow, Hail, Thunder, Storm }
@@ -405,6 +408,48 @@ object Extras {
         return m
     }
 
+    /** Prognosereihe (MW) je Zeitstempel aus public_power_forecast; leer bei Fehlern. */
+    private fun forecastMap(type: String, day: LocalDate): java.util.TreeMap<Long, Double> {
+        val m = java.util.TreeMap<Long, Double>()
+        try {
+            val o = JSONObject(Api.get("https://api.energy-charts.info/public_power_forecast?country=de&production_type=$type&forecast_type=current&start=$day&end=$day", false))
+            val t = o.getJSONArray("unix_seconds")
+            val d = o.optJSONArray("forecast_values") ?: o.optJSONArray("data") ?: return m
+            for (i in 0 until minOf(t.length(), d.length())) if (!d.isNull(i)) m[t.getLong(i)] = d.getDouble(i)
+        } catch (e: Exception) {
+        }
+        return m
+    }
+
+    /** Hängt hinter den letzten Messwert bis jetzt vorläufige Punkte an: Solar und Wind aus der Prognose, alles andere fortgeschrieben. */
+    private fun extendToNow(s: MixSeries, day: LocalDate): MixSeries {
+        val n = s.t.size
+        if (n < 2) return s
+        val stepS = s.t[n - 1] - s.t[n - 2]
+        if (stepS != 900L) return s
+        val now = System.currentTimeMillis() / 1000
+        val lastT = s.t[n - 1]
+        val add = ((now - lastT) / 900).toInt().coerceAtMost(16)
+        if (add < 1) return s
+        val solar = forecastMap("solar", day)
+        val wind = java.util.TreeMap<Long, Double>()
+        for (ty in listOf("wind_onshore", "wind_offshore")) for ((k, v) in forecastMap(ty, day)) wind[k] = (wind[k] ?: 0.0) + v
+        if (solar.isEmpty() && wind.isEmpty()) return s
+        fun at(m: java.util.TreeMap<Long, Double>, ts: Long): Double? {
+            val e = m.floorEntry(ts) ?: return null
+            return if (ts - e.key <= 3600L) e.value else null
+        }
+        val t2 = LongArray(n + add) { if (it < n) s.t[it] else lastT + 900L * (it - n + 1) }
+        val v2 = HashMap<String, DoubleArray>()
+        for ((k, arr) in s.v) {
+            val na = DoubleArray(n + add) { if (it < n) arr[it] else arr[n - 1] }
+            val fc = when (k) { "Solar" -> solar; "Wind" -> wind; else -> null }
+            if (fc != null && fc.isNotEmpty()) for (i in n until n + add) at(fc, t2[i])?.let { na[i] = it.coerceAtLeast(0.0) }
+            v2[k] = na
+        }
+        return MixSeries(t2, v2, s.hasTrade, s.solarShare, s.renShare, s.shareT, n)
+    }
+
     /** range: 0 = Tag (heute, sonst gestern), 1 = Woche (7 Tage), 2 = Jahr (365 Tage). */
     suspend fun loadMixSeries(range: Int): MixSeries? = withContext(Dispatchers.IO) {
         val ttl = when (range) { 0 -> 20L * 60 * 1000; 1 -> 60L * 60 * 1000; else -> 6L * 3600 * 1000 }
@@ -424,6 +469,9 @@ object Extras {
             0 -> fetch(today, today, 96) ?: fetch(today.minusDays(1), today.minusDays(1), 96)
             1 -> fetch(today.minusDays(6), today, 168)
             else -> fetch(today.minusDays(364), today, 183)
+        }
+        if (s != null && range == 0 && Instant.ofEpochSecond(s.t.last()).atZone(berlin).toLocalDate() == today) {
+            s = try { extendToNow(s, today) } catch (e: Exception) { s }
         }
         if (s != null) synchronized(mixCache) { mixCache[range] = System.currentTimeMillis() to s }
         s

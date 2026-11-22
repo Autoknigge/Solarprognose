@@ -357,7 +357,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
         val first = fmt(series.t[0], false)
         val lastT = series.t[n - 1]
         val head = if (s != null) {
-            (if (s >= n - 1 && range != 2) "Aktuell " else "") + fmt(series.t[s.coerceIn(0, n - 1)], range != 2)
+            (if (series.estFrom in 0..s) "Jetzt (vorläufig) " else if (s >= n - 1 && range != 2) "Aktuell " else "") + fmt(series.t[s.coerceIn(0, n - 1)], range != 2)
         } else when (range) {
             0 -> "Heute bis " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(lastT + 900).atZone(zone).hour, Instant.ofEpochSecond(lastT + 900).atZone(zone).minute)
             else -> "Durchschnitt $first bis ${fmt(lastT, false)}"
@@ -427,6 +427,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
                 )
             }
         }
+        if (series.estFrom >= 0) Text("Vorläufig: ab " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(series.t[series.estFrom]).atZone(zone).hour, Instant.ofEpochSecond(series.t[series.estFrom]).atZone(zone).minute) + " Solar und Wind aus der Energy-Charts-Prognose, übrige Werte vom letzten Messwert fortgeschrieben.", fontSize = 10.5.sp, color = Color(0xFFE3B341), lineHeight = 14.sp)
         Text("CO₂: Schätzung aus dem Erzeugungsmix mit festen Durchschnittswerten je Energieträger, ohne Import. Keine amtliche Messung.", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
         Text("Nettostromerzeugung der öffentlichen Stromversorgung, Anteile an der Erzeugung. Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
     }
