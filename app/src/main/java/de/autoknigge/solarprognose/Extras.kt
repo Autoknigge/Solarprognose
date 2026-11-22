@@ -260,7 +260,7 @@ object Extras {
 
     // ---------- Strommix (Energy-Charts, Fraunhofer ISE) ----------
 
-    val MIX_GROUPS = listOf("Kohle", "Erdgas", "Biomasse", "Wind", "Wasserkraft", "Solar", "Sonstige")
+    val MIX_GROUPS = listOf("Kohle", "Erdgas", "Biomasse", "Wind", "Wasserkraft", "Pumpspeicher", "Batterie", "Solar", "Sonstige")
     private val mixCache = HashMap<Int, Pair<Long, MixSeries>>()
 
     private fun mixGroup(name: String): String? {
@@ -272,7 +272,9 @@ object Extras {
             n == "fossil gas" -> "Erdgas"
             n.contains("biomass") -> "Biomasse"
             n.contains("wind") -> "Wind"
-            n.contains("hydro") && !n.contains("pumped") -> "Wasserkraft"
+            n.contains("pumped") -> "Pumpspeicher"
+            n.contains("battery") -> "Batterie"
+            n.contains("hydro") -> "Wasserkraft"
             n == "solar" -> "Solar"
             else -> "Sonstige"
         }
@@ -288,7 +290,7 @@ object Extras {
         val types = o.getJSONArray("production_types")
         val n = t.length()
         if (n == 0) return null
-        val keys = MIX_GROUPS + listOf("Import", "Export", "Braunkohle", "Steinkohle", "PumpLaden", "PumpAbgabe", "BattLaden", "BattAbgabe")
+        val keys = MIX_GROUPS + listOf("Import", "Export", "Braunkohle", "Steinkohle", "PumpLaden", "BattLaden")
         val raw = keys.associateWith { DoubleArray(n) }
         var last = -1
         var haveTrade = false
@@ -310,7 +312,7 @@ object Extras {
                 }
                 continue
             }
-            // Speicher: Laden (negative Werte oder Verbrauchsreihe) getrennt erfassen, Abgabe bleibt wie bisher in "Sonstige"
+            // Speicher: Laden (negative Werte oder Verbrauchsreihe) getrennt erfassen, Abgabe läuft als eigene Gruppe
             val stor = if (lower.contains("pumped")) "Pump" else if (lower.contains("battery")) "Batt" else null
             val isCharge = lower.contains("consum") || (lower.contains("charge") && !lower.contains("discharge"))
             if (stor != null) {
@@ -319,7 +321,6 @@ object Extras {
                     val v = d.getDouble(i)
                     if (isCharge) raw[stor + "Laden"]!![i] += Math.abs(v)
                     else if (v < 0) raw[stor + "Laden"]!![i] += -v
-                    else if (v > 0) raw[stor + "Abgabe"]!![i] += v
                 }
                 if (isCharge) continue
             }

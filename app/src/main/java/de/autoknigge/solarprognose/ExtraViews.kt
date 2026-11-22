@@ -310,7 +310,7 @@ fun PriceCard(prices: List<PriceHour>, nowSec: Long) {
 fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> Unit) {
     val colors = mapOf(
         "Kohle" to Color(0xFFD4714F), "Erdgas" to Color(0xFFA9896B), "Biomasse" to Color(0xFF9DBF5B),
-        "Wind" to Color(0xFF2E8B57), "Wasserkraft" to Color(0xFF4B5A9E), "Solar" to Color(0xFFE3B341), "Sonstige" to Color(0xFFA0A0A0),
+        "Wind" to Color(0xFF2E8B57), "Wasserkraft" to Color(0xFF4B5A9E), "Pumpspeicher" to Color(0xFF7FA6D9), "Batterie" to Color(0xFFB07CD8), "Solar" to Color(0xFFE3B341), "Sonstige" to Color(0xFFA0A0A0),
         "Import" to Color(0xFF5FD0E6), "Export" to Color(0xFFE8607A)
     )
     val zone = remember { ZoneId.of("Europe/Berlin") }
@@ -376,30 +376,31 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
                 }
             }
         }
-        MIX_GROUPS_UI.forEach { bar(it, it) }
-        if (series.v.containsKey("PumpLaden")) {
-            Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
-            val scaleGw = (top / 100.0 * prod / 1000.0).coerceAtLeast(0.5)
-            @Composable fun storage(label: String, load: String, give: String, color: Color) {
-                val l = avg(load) / 1000.0
-                val gv = avg(give) / 1000.0
-                Row(Modifier.fillMaxWidth().padding(top = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text(label, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
-                    Row(Modifier.weight(0.66f).height(16.dp)) {
-                        Box(Modifier.weight(0.5f).fillMaxHeight(), contentAlignment = androidx.compose.ui.Alignment.CenterEnd) {
-                            if (l > 0.005) Box(Modifier.fillMaxWidth((l / scaleGw * 0.78).toFloat().coerceIn(0.01f, 1f)).height(14.dp).background(color))
-                        }
-                        Box(Modifier.width(1.dp).fillMaxHeight().background(Color(0xFF6A6A6A)))
-                        Box(Modifier.weight(0.5f).fillMaxHeight(), contentAlignment = androidx.compose.ui.Alignment.CenterStart) {
-                            if (gv > 0.005) Box(Modifier.fillMaxWidth((gv / scaleGw * 0.78).toFloat().coerceIn(0.01f, 1f)).height(14.dp).background(color))
-                        }
+        val scaleGw = (top / 100.0 * prod / 1000.0).coerceAtLeast(0.5)
+        @Composable fun storage(name: String, load: String, color: Color) {
+            val l = (series.v[load]?.let { if (s != null) it[s.coerceIn(0, n - 1)] else it.average() } ?: 0.0) / 1000.0
+            val gv = avg(name) / 1000.0
+            Row(Modifier.fillMaxWidth().padding(top = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(name, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
+                Row(Modifier.weight(0.66f).height(16.dp)) {
+                    Box(Modifier.weight(0.5f).fillMaxHeight(), contentAlignment = androidx.compose.ui.Alignment.CenterEnd) {
+                        if (l > 0.005) Box(Modifier.fillMaxWidth((l / scaleGw * 0.78).toFloat().coerceIn(0.01f, 1f)).height(14.dp).background(color))
+                    }
+                    Box(Modifier.width(1.dp).fillMaxHeight().background(Color(0xFF6A6A6A)))
+                    Box(Modifier.weight(0.5f).fillMaxHeight(), contentAlignment = androidx.compose.ui.Alignment.CenterStart) {
+                        if (gv > 0.005) Box(Modifier.fillMaxWidth((gv / scaleGw * 0.78).toFloat().coerceIn(0.01f, 1f)).height(14.dp).background(color))
                     }
                 }
-                Text("laden " + Calc.fmt2(l) + " GW · abgeben " + Calc.fmt2(gv) + " GW", fontSize = 11.5.sp, color = LocalMuted.current, modifier = Modifier.padding(start = 0.dp))
             }
-            storage("Pumpspeicher", "PumpLaden", "PumpAbgabe", Color(0xFF7FA6D9))
-            storage("Batteriespeicher", "BattLaden", "BattAbgabe", Color(0xFFB07CD8))
-            Text("Speicher: links Laden (Verbrauch), rechts Abgabe. Die Abgabe ist in „Sonstige“ enthalten.", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
+            Text(
+                "laden " + Calc.fmt2(l) + " GW · abgeben " + Calc.fmt2(gv) + " GW (" + Calc.fmt1(avg(name) / prod * 100.0) + " %)",
+                fontSize = 11.5.sp, color = LocalMuted.current
+            )
+        }
+        MIX_GROUPS_UI.forEach {
+            if (it == "Pumpspeicher") storage(it, "PumpLaden", colors[it] ?: Color.Gray)
+            else if (it == "Batterie") storage("Batteriespeicher", "BattLaden", colors[it] ?: Color.Gray)
+            else bar(it, it)
         }
         if (series.hasTrade) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
@@ -435,7 +436,7 @@ private val MIX_GROUPS_UI = Extras.MIX_GROUPS
 
 /** Durchschnittliche Emission in g CO₂ je kWh (Lebenszyklus inkl. Vorkette, Deutschland; Kohle = Mittel aus Braun- und Steinkohle nach Strommengen 2025). */
 private val CO2_G = mapOf(
-    "Kohle" to 1065.0, "Erdgas" to 460.0, "Biomasse" to 290.0, "Wind" to 12.0, "Wasserkraft" to 12.0, "Solar" to 56.0, "Sonstige" to 500.0
+    "Kohle" to 1065.0, "Erdgas" to 460.0, "Biomasse" to 290.0, "Wind" to 12.0, "Wasserkraft" to 12.0, "Pumpspeicher" to 500.0, "Batterie" to 500.0, "Solar" to 56.0, "Sonstige" to 500.0
 )
 
 /** Anteil von Solar und Erneuerbaren am aktuellen Strombedarf in Deutschland (Energy-Charts). */
