@@ -30,6 +30,7 @@ android {
 
         buildConfigField("String", "API_BASE_URL", "\"$apiBase\"")
         buildConfigField("String", "APP_TOKEN", "\"$appToken\"")
+        manifestPlaceholders["appLabel"] = "@string/app_name"
     }
 
     signingConfigs {
@@ -50,6 +51,16 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = if (keystoreFile.isNotBlank()) signingConfigs.getByName("release")
             else signingConfigs.getByName("debug")
+        }
+    }
+
+    buildTypes {
+        // Zweite, parallel installierbare Variante für eigene Tests (nie in den Store hochladen)
+        create("preview") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".test"
+            manifestPlaceholders["appLabel"] = "Solarprognose Test"
+            matchingFallbacks += "release"
         }
     }
 

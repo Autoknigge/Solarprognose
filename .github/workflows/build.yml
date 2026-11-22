@@ -50,18 +50,25 @@ jobs:
           echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Bauen
-        run: ./gradlew --no-daemon assembleRelease bundleRelease
+        run: ./gradlew --no-daemon assembleRelease bundleRelease assemblePreview
 
       - name: Dateien umbenennen
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk dist/Solarprognose.apk
           cp app/build/outputs/bundle/release/app-release.aab dist/Solarprognose.aab
+          mkdir -p dist-test
+          cp app/build/outputs/apk/preview/app-preview.apk dist-test/Solarprognose-Test.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: Solarprognose
           path: dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Solarprognose-Test
+          path: dist-test/*
 
       - name: Release anlegen
         if: startsWith(github.ref, 'refs/tags/')
