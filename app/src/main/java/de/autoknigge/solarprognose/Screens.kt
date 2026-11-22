@@ -341,12 +341,24 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val sunNow = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone)
                 val curH = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1) }
                 if (curH != null) {
-                    Tile(
-                        "Jetzt", Calc.fmt1(curH.temp), "°C",
-                        Extras.codeText(curH) + " · Wolken " + Calc.fmt0(curH.cloud) + " %" + (if (curH.gust >= 20.0) " · Böen " + Calc.fmt0(curH.gust) + " km/h" else "") +
-                            "\n" + (uvNow?.let { "UV-Index " + Calc.fmt1(it) + " · " } ?: "") + (sunNow?.let { "Sonne ⬆️ " + it.first + "  ⬇️ " + it.second } ?: ""),
-                        Modifier.fillMaxWidth(), icon = Extras.kindOfHour(curH), bg = Panel2
-                    )
+                    val shapeJ = RoundedCornerShape(14.dp)
+                    Box(
+                        Modifier.fillMaxWidth().clip(shapeJ).background(cardBrush(Panel2)).border(1.dp, Gold.copy(alpha = 0.55f), shapeJ).padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Column(Modifier.padding(end = 44.dp)) {
+                            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(Calc.fmt1(curH.temp) + " °C", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                Text(Extras.codeText(curH), fontSize = 15.sp, color = Ink, modifier = Modifier.padding(bottom = 2.dp))
+                                Text("Wolken " + Calc.fmt0(curH.cloud) + " %", fontSize = 14.sp, color = Muted, modifier = Modifier.padding(bottom = 2.dp))
+                            }
+                            Text(
+                                (uvNow?.let { "UV-Index " + Calc.fmt1(it) + " · " } ?: "") + (sunNow?.let { "Sonne ⬆️ " + it.first + "  ⬇️ " + it.second } ?: "") +
+                                    (if (curH.gust >= 20.0) " · Böen " + Calc.fmt0(curH.gust) + " km/h" else ""),
+                                fontSize = 12.sp, color = Muted, lineHeight = 16.sp
+                            )
+                        }
+                        WeatherIcon(Extras.kindOfHour(curH), Modifier.align(Alignment.CenterEnd))
+                    }
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile("Heute", Calc.fmt1(d0.kwh), "kWh", if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",

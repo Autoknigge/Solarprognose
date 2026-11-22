@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.Instant
@@ -200,25 +201,41 @@ fun YearCard(kwp: Double, data: YearData, marks: List<Double>? = null) {
     val today = LocalDate.now()
     SectionCard(title = "Jahresprognose pro Monat (kWh)") {
         val s = sel
-        Text(
+        val ytdSum = marks?.take(today.monthValue)?.sum()
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             if (s != null && s < months.size) {
                 val days = YearMonth.of(today.year, s + 1).lengthOfMonth()
                 val mk = marks?.getOrNull(s)?.takeIf { s <= today.monthValue - 1 }
-                names[s] + ": Prognose " + Calc.fmt0(months[s]) + " kWh · Ø " + Calc.fmt1(months[s] / days) + " kWh pro Tag" +
-                    (if (mk != null) "\nDieses Jahr " + (if (s == today.monthValue - 1) "bisher " else "") + Calc.fmt0(mk) + " kWh (" + Calc.fmt0(if (months[s] > 0) mk / months[s] * 100.0 else 0.0) + " % der Prognose)" else "")
+                Text(names[s] + ": Prognose " + Calc.fmt0(months[s]) + " kWh · Ø " + Calc.fmt1(months[s] / days) + " kWh pro Tag", fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp)
+                if (mk != null) Text(
+                    "Erzielt " + today.year + (if (s == today.monthValue - 1) " bisher" else "") + ": " + Calc.fmt0(mk) + " kWh · " +
+                        Calc.fmt0(if (months[s] > 0) mk / months[s] * 100.0 else 0.0) + " % der Prognose erreicht",
+                    fontSize = 12.5.sp, color = Color(0xFFFF9A2E), lineHeight = 17.sp
+                )
             } else {
-                val ytdSum = marks?.take(today.monthValue)?.sum()
-                "Etwa " + Calc.fmt0(total) + " kWh pro Jahr" +
-                    (if (ytdSum != null) "\nBisher dieses Jahr " + Calc.fmt0(ytdSum) + " kWh" else "") +
-                    "\nTippe auf einen Balken für Details."
-            },
-            fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp
-        )
-        if (marks != null) Text("Orange: dieses Jahr erreicht · schwarzer Strich: Prognose · weiß: Prognosewert", fontSize = 11.5.sp, color = Muted)
+                Text("ca. " + Calc.fmt0(total) + " kWh pro Jahr", fontSize = 12.5.sp, color = Muted, lineHeight = 17.sp)
+                if (ytdSum != null) Text(
+                    "Erzielt " + today.year + ": " + Calc.fmt0(ytdSum) + " kWh · " + Calc.fmt0(if (total > 0) ytdSum / total * 100.0 else 0.0) + " % der Prognose erreicht",
+                    fontSize = 12.5.sp, color = Color(0xFFFF9A2E), lineHeight = 17.sp
+                )
+            }
+            if (marks != null) Text(
+                androidx.compose.ui.text.buildAnnotatedString {
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append("Weiß: Prognose") }
+                    append(". ")
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFFFF9A2E), fontWeight = FontWeight.Bold)) { append("Orange: erzielt") }
+                    append(". Strich: Stand der Erzeugung")
+                },
+                fontSize = 11.5.sp, color = Muted
+            )
+        }
         MonthChart(values = months, currentMonth = today.monthValue - 1, selected = sel, onSelect = { sel = it }, marks = marks)
+        val yrs = Regex("Jahre (\\d{4}) bis (\\d{4})").find(data.label)
         Text(
-            data.label + ", kein Wert für ein einzelnes Jahr. Die Balken zeigen die Werte dieses Jahres, aus dem Wetter berechnet (nicht gemessen). " +
-                (if (data.label.contains("Open-Meteo")) "Mit deiner Verschattung und Wechselrichter-Grenze, ohne Schnee." else "Ohne Verschattung, Schnee und Wechselrichter-Grenze."),
+            if (data.label.contains("Open-Meteo") && yrs != null)
+                "Berechneter Durchschnitt incl. deiner Verschattung und Wechselrichter-Grenze, ohne Schnee, aus Daten der Jahre " +
+                    yrs.groupValues[1] + " bis " + yrs.groupValues[2] + " (Open-Meteo). Erzielt: aus dem Wetter berechnet, nicht gemessen."
+            else data.label + ", ohne Verschattung, Schnee und Wechselrichter-Grenze. Erzielt: aus dem Wetter berechnet, nicht gemessen.",
             fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
         )
     }
