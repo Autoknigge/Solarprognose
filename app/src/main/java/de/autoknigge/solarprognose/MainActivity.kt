@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -23,7 +27,7 @@ class MainActivity : ComponentActivity() {
         val crash0 = CrashLog.read(this)
         setContent {
             SolarTheme {
-                var crash by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(crash0) }
+                var crash by remember { mutableStateOf(crash0) }
                 val c = crash
                 if (c != null) CrashScreen(c, onCopy = {
                     val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
