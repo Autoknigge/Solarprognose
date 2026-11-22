@@ -377,11 +377,11 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
             }
         }
         val scaleGw = (top / 100.0 * prod / 1000.0).coerceAtLeast(0.5)
-        @Composable fun storage(name: String, load: String, color: Color) {
+        @Composable fun storage(label: String, name: String, load: String, color: Color) {
             val l = (series.v[load]?.let { if (s != null) it[s.coerceIn(0, n - 1)] else it.average() } ?: 0.0) / 1000.0
             val gv = avg(name) / 1000.0
             Row(Modifier.fillMaxWidth().padding(top = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text(name, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
+                Text(label, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
                 Row(Modifier.weight(0.66f).height(16.dp)) {
                     Box(Modifier.weight(0.5f).fillMaxHeight(), contentAlignment = androidx.compose.ui.Alignment.CenterEnd) {
                         if (l > 0.005) Box(Modifier.fillMaxWidth((l / scaleGw * 0.78).toFloat().coerceIn(0.01f, 1f)).height(14.dp).background(color))
@@ -398,8 +398,8 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
             )
         }
         MIX_GROUPS_UI.forEach {
-            if (it == "Pumpspeicher") storage(it, "PumpLaden", colors[it] ?: Color.Gray)
-            else if (it == "Batterie") storage("Batteriespeicher", "BattLaden", colors[it] ?: Color.Gray)
+            if (it == "Pumpspeicher") storage(it, it, "PumpLaden", colors[it] ?: Color.Gray)
+            else if (it == "Batterie") storage("Batteriespeicher", it, "BattLaden", colors[it] ?: Color.Gray)
             else bar(it, it)
         }
         if (series.hasTrade) {
