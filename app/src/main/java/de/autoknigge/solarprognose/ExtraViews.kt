@@ -242,12 +242,10 @@ fun YearCard(kwp: Double, data: YearData, marks: List<Double>? = null) {
                 androidx.compose.ui.text.buildAnnotatedString {
                     withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append("Weiß: Prognose") }
                     append(". ")
-                    withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFFFF9A2E), fontWeight = FontWeight.Bold)) { append("Orange: Erzielt") }
-                    append(".")
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFFFF9A2E), fontWeight = FontWeight.Bold)) { append("Orange & Strich: Ergebnis bis heute") }
                 },
                 fontSize = 11.5.sp, color = Muted
             )
-            if (marks != null) Text("Strich: Stand der Erzeugung", fontSize = 11.5.sp, color = Muted)
         }
         MonthChart(values = months, currentMonth = today.monthValue - 1, selected = sel, onSelect = { sel = it }, marks = marks)
         val yrs = Regex("Jahre (\\d{4}) bis (\\d{4})").find(data.label)
@@ -352,14 +350,14 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
         }
         Text(head + " · Erzeugung " + Calc.fmt1(prod / 1000.0) + " GW", fontSize = 12.sp, color = LocalMuted.current)
         val top = MIX_GROUPS_UI.maxOf { avg(it) / prod * 100.0 }.coerceAtLeast(1.0)
-        @Composable fun bar(name: String, label: String) {
+        @Composable fun bar(name: String, label: String, gwOnly: Boolean = false) {
             val pct = avg(name) / prod * 100.0
             val w = ((pct / top) * 0.78).toFloat().coerceIn(0.01f, 0.78f)
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text(label, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
                 Row(Modifier.weight(0.66f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     Box(Modifier.weight(w).height(22.dp).background(colors[name] ?: Color.Gray))
-                    Text(Calc.fmt1(pct) + " %", fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.padding(start = 6.dp), maxLines = 1)
+                    Text(if (gwOnly) Calc.fmt2(avg(name) / 1000.0) + " GW" else Calc.fmt1(pct) + " % · " + Calc.fmt1(avg(name) / 1000.0) + " GW", fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.padding(start = 6.dp), maxLines = 1)
                     Box(Modifier.weight((1f - w).coerceAtLeast(0.01f)))
                 }
             }
@@ -367,11 +365,12 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
         MIX_GROUPS_UI.forEach { bar(it, it) }
         if (series.hasTrade) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
-            bar("Import", "Import")
-            bar("Export", "Export")
+            bar("Import", "Import", true)
+            bar("Export", "Export", true)
             val net = (avg("Import") - avg("Export")) / 1000.0
             Text(
-                (if (net >= 0) "Netto-Import " else "Netto-Export ") + Calc.fmt1(Math.abs(net)) + " GW",
+                (if (net >= 0) "Netto-Import " else "Netto-Export ") + Calc.fmt2(Math.abs(net)) + " GW (Import " + Calc.fmt2(avg("Import") / 1000.0) +
+                    " minus Export " + Calc.fmt2(avg("Export") / 1000.0) + ")",
                 fontSize = 12.sp, color = LocalMuted.current
             )
         }
