@@ -346,6 +346,8 @@ fun MonthChart(
         val maxV = maxOf(1.0, values.maxOrNull() ?: 1.0, marks?.take(currentMonth + 1)?.maxOrNull() ?: 0.0)
         val nativeCanvas = drawContext.canvas.nativeCanvas
 
+        // Zahlen bis 4 Stellen (unter 10.000 kWh je Monat, ca. bis 70 kWp) passen in eine Zeile, sonst versetzt
+        val stagger = maxV >= 10000.0
         drawLine(color = AxisColor, start = Offset(m, base), end = Offset(w - m, base), strokeWidth = 1.dp.toPx())
 
         values.forEachIndexed { k, v ->
@@ -372,7 +374,7 @@ fun MonthChart(
                 drawPath(path, color = c)
             }
             // Prognosewert rot (im aktuellen Monat weiß auf Orange), alle auf gleicher Höhe unten im Balken
-            nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", v), cx, base - 5.dp.toPx() - (if (k % 2 == 1) 13.dp.toPx() else 0f), whitePaint)
+            nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", v), cx, base - 5.dp.toPx() - (if (stagger && k % 2 == 1) 13.dp.toPx() else 0f), whitePaint)
             // Strich: Stand der Erzeugung (schwarz innerhalb der Prognose, orange darüber), Zahl in Orange oben
             if (mk != null) {
                 val ym = base - (mk / (maxV * 1.12) * ih).toFloat()
