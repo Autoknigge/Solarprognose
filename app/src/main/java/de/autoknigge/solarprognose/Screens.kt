@@ -488,7 +488,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Text("Tippe oder wische ins Diagramm für Details.", fontSize = 11.5.sp, color = WarmMuted)
                 }
 
-                vm.selected?.let { sp -> ProfileCard(vm.profile[sp.id], vm.profileFailed, sp.lat, sp.lon, full.hours.associate { it.time.substring(0, 13) to it.temp }) }
+                vm.selected?.let { sp -> ProfileCard(vm.profile[sp.id], vm.profileFailed, sp.lat, sp.lon, (full?.hours ?: emptyList()).associate { it.time.substring(0, 13) to it.temp }) }
 
                 SectionCard(title = "Tabelle", bg = TileTomorrow, borderColor = Color(0xFFE8A060), mutedColor = WarmMuted) {
                     Row(Modifier.fillMaxWidth()) {
