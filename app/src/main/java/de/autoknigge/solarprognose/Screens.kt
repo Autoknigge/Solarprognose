@@ -333,8 +333,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val sunNow = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone)
                 val nowZ = java.time.ZonedDateTime.now(java.time.ZoneId.of(forecast.timezone))
                 val setMin = sunNow?.second?.split(":")?.let { (it[0].toInt() * 60 + it[1].toInt()) }
-                // 1,5 h nach Sonnenuntergang: Anzeige springt auf den nächsten Tag
-                val eveningSwitch = d1 != null && setMin != null && nowZ.toLocalDate().toString() == d0.date && nowZ.hour * 60 + nowZ.minute >= setMin + 90
+                // 2 h nach Sonnenuntergang: Anzeige springt auf den nächsten Tag
+                val eveningSwitch = d1 != null && setMin != null && nowZ.toLocalDate().toString() == d0.date && nowZ.hour * 60 + nowZ.minute >= setMin + 120
                 val shown = if (eveningSwitch) forecast.days.drop(1) else forecast.days
                 val t0 = shown[0]
                 val t1 = shown.getOrNull(1)

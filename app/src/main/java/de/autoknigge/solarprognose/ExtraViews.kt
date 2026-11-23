@@ -166,7 +166,7 @@ fun TomorrowCard(total: Double, sunTotal: Double?, peakW: Double?, peakHour: Int
             if (sunTotal != null) CompactStat("Sonne", Calc.fmt1(sunTotal), "h", GoldSoft)
         }
         Text(
-            "Ab 1,5 Stunden nach Sonnenuntergang zeigt die App die Prognose für morgen." + (if (peakHour != null) " Spitze gegen " + peakHour + " Uhr." else ""),
+            "Ab 2 Stunden nach Sonnenuntergang zeigt die App die Prognose für morgen." + (if (peakHour != null) " Spitze gegen " + peakHour + " Uhr." else ""),
             fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
     }
