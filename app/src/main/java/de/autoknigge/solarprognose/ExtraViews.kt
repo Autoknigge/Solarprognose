@@ -363,7 +363,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
             0 -> "Heute bis " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(lastT + 900).atZone(zone).hour, Instant.ofEpochSecond(lastT + 900).atZone(zone).minute)
             else -> "Durchschnitt $first bis ${fmt(lastT, false)}"
         }
-        Text(head + " · Erzeugung " + Calc.fmt1(prod / 1000.0) + " GW", fontSize = 12.sp, color = LocalMuted.current)
+        Text(head + " · Erzeugung " + Calc.fmt1(prod / 1000.0) + " GW (Prozent = Anteil an der Erzeugung)", fontSize = 12.sp, color = LocalMuted.current)
         val top = MIX_GROUPS_UI.maxOf { avg(it) / prod * 100.0 }.coerceAtLeast(1.0)
         @Composable fun bar(name: String, label: String, gwOnly: Boolean = false) {
             val pct = avg(name) / prod * 100.0
@@ -454,12 +454,12 @@ fun GridNowCard(m: MixSeries) {
         bg = Color(0xFFD24E01), borderColor = Color(0xFFFFB27A), inkColor = Color.White, mutedColor = Color(0xFFFFE0CC), darken = 0f
     ) {
         Text(
-            "Deutschland, Stand " + String.format(Locale.GERMANY, "%02d:%02d Uhr", z.hour, z.minute),
+            "Deutschland, Stand " + String.format(Locale.GERMANY, "%02d:%02d Uhr", z.hour, z.minute) + (if (m.estFrom in 0 until m.t.size && m.shareT >= m.t[m.estFrom]) " (vorläufig)" else ""),
             fontSize = 12.sp, color = LocalMuted.current
         )
         listOf(
-            Triple("Solarstrom", solar, Color(0xFFE3B341)),
-            Triple("Erneuerbare gesamt", ren, Color(0xFF4FB477))
+            Triple("Solarstrom (Anteil am Verbrauch)", solar, Color(0xFFE3B341)),
+            Triple("Erneuerbare gesamt (Anteil am Verbrauch)", ren, Color(0xFF4FB477))
         ).forEach { (label, pct, col) ->
             Column {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Bottom) {

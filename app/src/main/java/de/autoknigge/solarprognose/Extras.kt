@@ -447,7 +447,21 @@ object Extras {
             if (fc != null && fc.isNotEmpty()) for (i in n until n + add) at(fc, t2[i])?.let { na[i] = it.coerceAtLeast(0.0) }
             v2[k] = na
         }
-        return MixSeries(t2, v2, s.hasTrade, s.solarShare, s.renShare, s.shareT, n)
+        // Anteile am Verbrauch auf den vorläufigen Zeitpunkt umrechnen: Last aus Prognose, sonst vom letzten Messwert abgeleitet
+        var sShare = s.solarShare
+        var rShare = s.renShare
+        var sT = s.shareT
+        val mi = s.t.indexOf(s.shareT)
+        val lastI = n + add - 1
+        var load: Double? = at(forecastMap("load", day), t2[lastI])?.takeIf { it > 1000.0 }
+        if (load == null && mi >= 0 && s.solarShare != null && s.solarShare > 0.5) load = (s.v["Solar"]?.get(mi) ?: 0.0) / s.solarShare * 100.0
+        if (load != null && load > 1000.0) {
+            fun g(k: String) = v2[k]?.get(lastI) ?: 0.0
+            sShare = g("Solar") / load * 100.0
+            rShare = (g("Solar") + g("Wind") + g("Biomasse") + g("Wasserkraft")) / load * 100.0
+            sT = t2[lastI]
+        }
+        return MixSeries(t2, v2, s.hasTrade, sShare, rShare, sT, n)
     }
 
     /** range: 0 = Tag (heute, sonst gestern), 1 = Woche (7 Tage), 2 = Jahr (365 Tage). */
