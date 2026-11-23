@@ -381,14 +381,19 @@ fun MonthChart(
                 val ym = base - (mk / (maxV * 1.12) * ih).toFloat()
                 val col = if (mk <= v) Color.Black else Color(0xFFFF9A2E)
                 drawLine(col, Offset(x - 2.dp.toPx(), ym), Offset(x + bw + 2.dp.toPx(), ym), strokeWidth = 1.5.dp.toPx())
-                // direkt über dem Strich; nur wenn die Zahl des Vormonats zu nah liegt, eine Zeile höher
+                // direkt über dem Strich; nur wenn die Zahl des Vormonats zu nah liegt, eine oder zwei Zeilen höher (nie in den Balken)
                 val line = 13.dp.toPx()
-                var ty = minOf(y, ym) - 5.dp.toPx()
-                if (prevTy != null && Math.abs(ty - prevTy!!) < line) {
-                    ty -= line
-                    if (Math.abs(ty - prevTy!!) < line) ty += 2 * line
+                val natural = minOf(y, ym) - 5.dp.toPx()
+                var ty = natural
+                val pv = prevTy
+                if (pv != null) {
+                    for (st in 0..3) {
+                        ty = natural - st * line
+                        if (Math.abs(ty - pv) >= line) break
+                    }
                 }
                 prevTy = ty
+                if (natural - ty > 1f) drawLine(Color(0xAAFF9A2E), Offset(cx, ty + 3.dp.toPx()), Offset(cx, natural + 3.dp.toPx()), strokeWidth = 1.dp.toPx())
                 nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", mk), cx, ty, orangePaint)
             }
             nativeCanvas.drawText(MONTHS[k], cx, base + 15.dp.toPx(), if (k == currentMonth) paints.dayToday else paints.tickCenter)
