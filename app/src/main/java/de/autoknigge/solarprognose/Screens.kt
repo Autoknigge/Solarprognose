@@ -372,7 +372,11 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 }
 
                 val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0) }
-                if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
+                val nowZ = java.time.ZonedDateTime.now(java.time.ZoneId.of(forecast.timezone))
+                val setMin = sunNow?.second?.split(":")?.let { (it[0].toInt() * 60 + it[1].toInt()) }
+                val eveningSwitch = d1 != null && setMin != null && nowZ.toLocalDate().toString() == d0.date && nowZ.hour * 60 + nowZ.minute >= setMin + 90
+                if (eveningSwitch && d1 != null) TomorrowCard(d1.kwh, d1.sunH, d1.peak, d1.peakHour)
+                else if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
 
                 val dayF = full ?: forecast
                 val hourF = if (range == -2) dayF else forecast

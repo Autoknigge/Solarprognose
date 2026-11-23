@@ -158,6 +158,21 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
 
 /** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest, kompakt. */
 @Composable
+fun TomorrowCard(total: Double, sunTotal: Double?, peakW: Double?, peakHour: Int?) {
+    SectionCard(title = "") {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            CompactStat("Prognose morgen", Calc.fmt1(total), "kWh")
+            if (peakW != null) CompactStat("Spitze", Calc.fmt0(peakW), "W", TodayOrange)
+            if (sunTotal != null) CompactStat("Sonne", Calc.fmt1(sunTotal), "h", GoldSoft)
+        }
+        Text(
+            "Ab 1,5 Stunden nach Sonnenuntergang zeigt die App die Prognose für morgen." + (if (peakHour != null) " Spitze gegen " + peakHour + " Uhr." else ""),
+            fontSize = 11.sp, color = Muted, lineHeight = 15.sp
+        )
+    }
+}
+
+@Composable
 fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sunTotal: Double? = null, sunRest: Double? = null) {
     val done = (total - rest).coerceAtLeast(0.0)
     val frac = if (total > 0.0) (done / total).toFloat().coerceIn(0f, 1f) else 0f
