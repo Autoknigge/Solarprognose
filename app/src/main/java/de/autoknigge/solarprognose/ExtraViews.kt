@@ -158,15 +158,15 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
 
 /** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest, kompakt. */
 @Composable
-fun TomorrowCard(total: Double, sunTotal: Double?, peakW: Double?, peakHour: Int?) {
+fun TomorrowCard(total: Double, sunTotal: Double?, firstKwh: String?) {
     SectionCard(title = "") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             CompactStat("Prognose morgen", Calc.fmt1(total), "kWh")
-            if (peakW != null) CompactStat("Spitze", Calc.fmt0(peakW), "W", TodayOrange)
+            if (firstKwh != null) CompactStat("Erste kWh um", firstKwh, "Uhr", TodayOrange)
             if (sunTotal != null) CompactStat("Sonne", Calc.fmt1(sunTotal), "h", GoldSoft)
         }
         Text(
-            "Ab 2 Stunden nach Sonnenuntergang zeigt die App die Prognose für morgen." + (if (peakHour != null) " Spitze gegen " + peakHour + " Uhr." else ""),
+            "Ab 2 Stunden nach Sonnenuntergang zeigt die App die Prognose für morgen. „Erste kWh“: wann deine Anlage (inkl. Verschattung) die erste Kilowattstunde erzeugt haben wird.",
             fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
     }
