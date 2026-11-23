@@ -326,7 +326,7 @@ fun MonthChart(
     Canvas(
         modifier
             .fillMaxWidth()
-            .height(200.dp)
+            .height(208.dp)
             .pointerInput(n) {
                 detectTapGestures { off -> onSelect(monthAt(off.x, size.width.toFloat(), 4.dp.toPx())) }
             }
@@ -337,7 +337,7 @@ fun MonthChart(
         val w = size.width
         val h = size.height
         val m = 4.dp.toPx()
-        val mt = 22.dp.toPx()
+        val mt = 30.dp.toPx()
         val mb = 22.dp.toPx()
         val ih = h - mt - mb
         val band = (w - 2 * m) / n
@@ -378,7 +378,7 @@ fun MonthChart(
                 val ym = base - (mk / (maxV * 1.12) * ih).toFloat()
                 val col = if (mk <= v) Color.Black else Color(0xFFFF9A2E)
                 drawLine(col, Offset(x - 2.dp.toPx(), ym), Offset(x + bw + 2.dp.toPx(), ym), strokeWidth = 1.5.dp.toPx())
-                nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", mk), cx, minOf(y, ym) - 5.dp.toPx() - (if (k % 2 == 1) 13.dp.toPx() else 0f), orangePaint)
+                nativeCanvas.drawText(String.format(Locale.GERMANY, "%.0f", mk), cx, minOf(y, ym) - 5.dp.toPx() - 4.dp.toPx() * minOf(k, n - 1 - k), orangePaint)
             }
             nativeCanvas.drawText(MONTHS[k], cx, base + 15.dp.toPx(), if (k == currentMonth) paints.dayToday else paints.tickCenter)
         }
