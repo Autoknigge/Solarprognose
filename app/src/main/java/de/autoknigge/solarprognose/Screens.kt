@@ -335,11 +335,11 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val setMin = sunNow?.second?.split(":")?.let { (it[0].toInt() * 60 + it[1].toInt()) }
                 // 2 h nach Sonnenuntergang: Anzeige springt auf den nächsten Tag
                 val eveningSwitch = d1 != null && setMin != null && nowZ.toLocalDate().toString() == d0.date && nowZ.hour * 60 + nowZ.minute >= setMin + 120
-                val shown = if (eveningSwitch) forecast.days.drop(1) else forecast.days
-                val t0 = shown[0]
-                val t1 = shown.getOrNull(1)
-                val total = shown.sumOf { it.kwh }
-                val best = shown.maxByOrNull { it.kwh } ?: t0
+                val dayList = if (eveningSwitch) forecast.days.drop(1) else forecast.days
+                val t0 = dayList[0]
+                val t1 = dayList.getOrNull(1)
+                val total = dayList.sumOf { it.kwh }
+                val best = dayList.maxByOrNull { it.kwh } ?: t0
                 val rest = nowC?.let { Calc.remainingToday(forecast, it) }
 
                 val uvNow = nowC?.let { c ->
@@ -374,7 +374,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         Modifier.weight(1f).fillMaxHeight(), icon = t1?.let { Extras.kindOf(it) }, bg = TileTomorrow, mutedColor = Color(0xFFFFEBD6))
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Tile(shown.size.toString() + " Tage", Calc.fmt0(total), "kWh", "Ø " + Calc.fmt1(total / shown.size) + " kWh pro Tag", Modifier.weight(1f).fillMaxHeight())
+                    Tile(dayList.size.toString() + " Tage", Calc.fmt0(total), "kWh", "Ø " + Calc.fmt1(total / dayList.size) + " kWh pro Tag", Modifier.weight(1f).fillMaxHeight())
                     Tile("Bester Tag", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight(), bg = Color(0xFFEE9F27), mutedColor = Color(0xFF4A2E00))
                 }
 
