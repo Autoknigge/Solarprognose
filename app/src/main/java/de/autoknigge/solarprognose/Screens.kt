@@ -330,15 +330,22 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
             } else {
                 val d0 = forecast.days[0]
                 val d1 = forecast.days.getOrNull(1)
-                val total = forecast.days.sumOf { it.kwh }
-                val best = forecast.days.maxByOrNull { it.kwh } ?: d0
+                val sunNow = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone)
+                val nowZ = java.time.ZonedDateTime.now(java.time.ZoneId.of(forecast.timezone))
+                val setMin = sunNow?.second?.split(":")?.let { (it[0].toInt() * 60 + it[1].toInt()) }
+                // 1,5 h nach Sonnenuntergang: Anzeige springt auf den nächsten Tag
+                val eveningSwitch = d1 != null && setMin != null && nowZ.toLocalDate().toString() == d0.date && nowZ.hour * 60 + nowZ.minute >= setMin + 90
+                val shown = if (eveningSwitch) forecast.days.drop(1) else forecast.days
+                val t0 = shown[0]
+                val t1 = shown.getOrNull(1)
+                val total = shown.sumOf { it.kwh }
+                val best = shown.maxByOrNull { it.kwh } ?: t0
                 val rest = nowC?.let { Calc.remainingToday(forecast, it) }
 
                 val uvNow = nowC?.let { c ->
                     val cur = forecast.hours.getOrNull(Math.floor(c).toInt() + 1)?.uv ?: 0.0
                     if (cur > 0.0) cur else d0.uvMax
                 }?.takeIf { it > 0.0 }
-                val sunNow = Calc.sunTimes(plant.lat, plant.lon, forecast.timezone)
                 val curH = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1) }
                 if (curH != null) {
                     val shapeJ = RoundedCornerShape(14.dp)
@@ -361,20 +368,17 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Tile("Heute", Calc.fmt1(d0.kwh), "kWh", if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
-                        Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(d0), bg = TileToday, mutedColor = Color(0xFFFFE6DA))
-                    Tile("Morgen", d1?.let { Calc.fmt1(it.kwh) } ?: "–", "kWh", d1?.let { "Spitze " + Calc.fmt0(it.peak) + " W gegen " + it.peakHour + " Uhr" } ?: "",
-                        Modifier.weight(1f).fillMaxHeight(), icon = d1?.let { Extras.kindOf(it) }, bg = TileTomorrow, mutedColor = Color(0xFFFFEBD6))
+                    Tile(if (eveningSwitch) "Morgen" else "Heute", Calc.fmt1(t0.kwh), "kWh", if (eveningSwitch) "Spitze " + Calc.fmt0(t0.peak) + " W gegen " + t0.peakHour + " Uhr" else if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
+                        Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(t0), bg = TileToday, mutedColor = Color(0xFFFFE6DA))
+                    Tile(if (eveningSwitch) "Übermorgen" else "Morgen", t1?.let { Calc.fmt1(it.kwh) } ?: "–", "kWh", t1?.let { "Spitze " + Calc.fmt0(it.peak) + " W gegen " + it.peakHour + " Uhr" } ?: "",
+                        Modifier.weight(1f).fillMaxHeight(), icon = t1?.let { Extras.kindOf(it) }, bg = TileTomorrow, mutedColor = Color(0xFFFFEBD6))
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Tile("7 Tage", Calc.fmt0(total), "kWh", "Ø " + Calc.fmt1(total / forecast.days.size) + " kWh pro Tag", Modifier.weight(1f).fillMaxHeight())
+                    Tile(shown.size.toString() + " Tage", Calc.fmt0(total), "kWh", "Ø " + Calc.fmt1(total / shown.size) + " kWh pro Tag", Modifier.weight(1f).fillMaxHeight())
                     Tile("Bester Tag", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight(), bg = Color(0xFFEE9F27), mutedColor = Color(0xFF4A2E00))
                 }
 
                 val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0) }
-                val nowZ = java.time.ZonedDateTime.now(java.time.ZoneId.of(forecast.timezone))
-                val setMin = sunNow?.second?.split(":")?.let { (it[0].toInt() * 60 + it[1].toInt()) }
-                val eveningSwitch = d1 != null && setMin != null && nowZ.toLocalDate().toString() == d0.date && nowZ.hour * 60 + nowZ.minute >= setMin + 90
                 if (eveningSwitch && d1 != null) TomorrowCard(d1.kwh, d1.sunH, d1.peak, d1.peakHour)
                 else if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
 
