@@ -237,7 +237,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
     val forecast = remember(vm.raws, sel) { Calc.forecastFor(vm.raws, sel, false) }
     // Mit 2 Tagen Rückblick für Ertrag pro Tag, Leistung, Bewölkung/Temperatur und Tabelle
     val full = remember(vm.raws, sel) { Calc.forecastFor(vm.raws, sel, true) }
-    var range by rememberSaveable { mutableIntStateOf(3) }
+    var range by rememberSaveable { mutableIntStateOf(1) }
     var selHour by remember(plant.id) { mutableStateOf<Int?>(null) }
     var selDay by remember(plant.id) { mutableStateOf<Int?>(null) }
     var selWx by remember(plant.id) { mutableStateOf<Int?>(null) }
@@ -456,8 +456,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed) { vm.selectMix(it) }
                 SectionCard(
                     title = "Bewölkung und Temperatur",
-                    bg = TileTomorrow,
-                    borderColor = Color(0xFFE8A060),
+                    bg = Color(0xFFD24E01),
+                    borderColor = Color(0xFFFFB27A),
                                     mutedColor = WarmMuted,
                 ) {
                     RangeChips(range) { range = it; selHour = null; selWx = null }
@@ -488,7 +488,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Text("Tippe oder wische ins Diagramm für Details.", fontSize = 11.5.sp, color = WarmMuted)
                 }
 
-                vm.selected?.let { sp -> ProfileCard(vm.profile[sp.id], vm.profileFailed, sp.lat, sp.lon) }
+                vm.selected?.let { sp -> ProfileCard(vm.profile[sp.id], vm.profileFailed, sp.lat, sp.lon, full.hours.associate { it.time.substring(0, 13) to it.temp }) }
 
                 SectionCard(title = "Tabelle", bg = TileTomorrow, borderColor = Color(0xFFE8A060), mutedColor = WarmMuted) {
                     Row(Modifier.fillMaxWidth()) {

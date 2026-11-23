@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -653,10 +654,10 @@ private fun profileCloudAt(d: ProfileData, i: Int, hm: Double): Double {
 
 /** Niederschlag (mm/h, geglättet) und Wolkenprofil 0 bis 14 km in Wetterkarten-Optik: Tagesköpfe, Tag/Nacht-Bänder, seitlich verschiebbar. */
 @Composable
-fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double) {
+fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double, temps: Map<String, Double> = emptyMap()) {
     SectionCard(
         title = "Niederschlag und Wolken",
-        bg = Color.Black, borderColor = Color(0xFF3A3A3A), inkColor = Color(0xFFEDEDED), mutedColor = Color(0xFF9A9A9A), darken = 0f
+        bg = Color(0xFFEE9F27), borderColor = Color(0xFFF7C46A), inkColor = Color(0xFF1E1200), mutedColor = Color(0xFF4A2E00), darken = 0f
     ) {
         if (d == null || d.time.isEmpty()) {
             Text(if (failed) "Daten gerade nicht erreichbar." else "Lade Daten …", fontSize = 13.sp, color = LocalMuted.current)
@@ -688,10 +689,20 @@ fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double) {
         }
         val rainStep = if (rainTop <= 5.0) 1.0 else 5.0
         val rainTotal = d.rain.filter { !it.isNaN() }.sum()
-        val panel = Color(0xFF211F20)
-        val dayBand = Color(0xFF37464F)
-        val lo = Color(0xFF101C2A)
-        val hi = Color(0xFFF4F8FB)
+        val panel = Color(0xFFC98414)
+        val dayBand = Color(0xFFF7C46A)
+        val ink = 0xFF2A1800.toInt()
+        val lo = Color(0xFFE2E2E2)
+        val hi = Color(0xFF121212)
+        val tempArr = remember(d, temps) { DoubleArray(n) { i -> temps[d.time[i].substring(0, 13)] ?: Double.NaN } }
+        val heatImg = remember(d) {
+            val bmp = android.graphics.Bitmap.createBitmap(n, PROFILE_ROWS, android.graphics.Bitmap.Config.ARGB_8888)
+            for (i in 0 until n) for (r in 0 until PROFILE_ROWS) {
+                val v = (grid[i][r] / 100.0).toFloat().coerceIn(0f, 1f)
+                bmp.setPixel(i, PROFILE_ROWS - 1 - r, androidx.compose.ui.graphics.lerp(lo, hi, Math.pow(v.toDouble(), 0.85).toFloat()).toArgb())
+            }
+            bmp.asImageBitmap()
+        }
         val colW = 11.dp
         val hdrH = 44.dp
         val rainH = 140.dp
@@ -713,8 +724,8 @@ fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double) {
         Row(Modifier.fillMaxWidth()) {
             // feste Achsen links, mit gedrehtem Titel
             Canvas(Modifier.size(width = 52.dp, height = totalH)) {
-                val white = android.graphics.Paint().apply { isAntiAlias = true; color = 0xFFEDEDED.toInt(); textSize = 12.sp.toPx(); textAlign = android.graphics.Paint.Align.RIGHT }
-                val title = android.graphics.Paint().apply { isAntiAlias = true; color = 0xFFEDEDED.toInt(); textSize = 12.sp.toPx(); textAlign = android.graphics.Paint.Align.CENTER }
+                val white = android.graphics.Paint().apply { isAntiAlias = true; color = 0xFF2A1800.toInt(); textSize = 12.sp.toPx(); textAlign = android.graphics.Paint.Align.RIGHT }
+                val title = android.graphics.Paint().apply { isAntiAlias = true; color = 0xFF2A1800.toInt(); textSize = 12.sp.toPx(); textAlign = android.graphics.Paint.Align.CENTER }
                 val nc = drawContext.canvas.nativeCanvas
                 val r0 = hdrH.toPx()
                 val rh = rainH.toPx()
@@ -757,7 +768,7 @@ fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double) {
                     fun paint(c: Int, sp: Float, bold: Boolean = false) = android.graphics.Paint().apply {
                         isAntiAlias = true; color = c; textSize = sp.sp.toPx(); textAlign = android.graphics.Paint.Align.CENTER; isFakeBoldText = bold
                     }
-                    val tick = paint(0xFFEDEDED.toInt(), 12f)
+                    val tick = paint(ink, 12f)
                     val dash = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3f, 6f))
 
                     // Tagesköpfe
@@ -766,7 +777,7 @@ fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double) {
                         val a = d.time.indexOfFirst { it.startsWith(dt) }
                         val b = d.time.indexOfLast { it.startsWith(dt) } + 1
                         val cx = (a + b) / 2f * cw
-                        val col = if (dt == todayStr) 0xFFFF2A2A.toInt() else 0xFFEDEDED.toInt()
+                        val col = if (dt == todayStr) 0xFF7A0010.toInt() else ink
                         val dn = java.time.LocalDate.parse(dt).dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, Locale.GERMAN)
                         nc.drawText(dn, cx, 18.dp.toPx(), paint(col, 15f))
                         nc.drawText(Calc.dm(dt).trimEnd('.'), cx, 36.dp.toPx(), paint(col, 15f))
@@ -799,17 +810,41 @@ fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double) {
                     area.lineTo(w, base)
                     area.lineTo(0f, base)
                     area.close()
-                    drawPath(area, Color(0xCCD0D0D0))
-                    drawPath(line, Color.White, style = Stroke(width = 1.2.dp.toPx(), join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                    drawPath(area, Color(0xE69AD8FF))
+                    drawPath(line, Color(0xFF3FA9F5), style = Stroke(width = 1.2.dp.toPx(), join = androidx.compose.ui.graphics.StrokeJoin.Round))
 
-                    // Wolken-Wärmebild
-                    for (i in 0 until n) {
-                        for (r in 0 until PROFILE_ROWS) {
-                            val v = (grid[i][r] / 100.0).toFloat().coerceIn(0f, 1f)
-                            val col = androidx.compose.ui.graphics.lerp(lo, hi, Math.pow(v.toDouble(), 0.85).toFloat())
-                            drawRect(col, Offset(i * cw, h0 + hh - (r + 1) * cellH), Size(cw + 0.6f, cellH + 0.6f))
+                    // Temperaturkurve (geglättet) über dem Regenfeld
+                    val tv = tempArr.filter { !it.isNaN() }
+                    if (tv.size > 3) {
+                        val sm = DoubleArray(n) { i ->
+                            var sum = 0.0; var c = 0
+                            for (j in maxOf(0, i - 2)..minOf(n - 1, i + 2)) if (!tempArr[j].isNaN()) { sum += tempArr[j]; c++ }
+                            if (c > 0) sum / c else Double.NaN
+                        }
+                        val tLo = Math.floor(tv.min()) - 1
+                        val tHi = Math.ceil(tv.max()) + 1
+                        fun ty(t: Double) = r0 + rh * 0.92f - ((t - tLo) / (tHi - tLo) * rh * 0.84f).toFloat()
+                        val tp = (0 until n).filter { !sm[it].isNaN() }.map { Offset((it + 0.5f) * cw, ty(sm[it])) }
+                        val tl = Path()
+                        tl.moveTo(tp[0].x, tp[0].y)
+                        for (i in 1 until tp.size) {
+                            val mx = (tp[i - 1].x + tp[i].x) / 2f
+                            tl.cubicTo(mx, tp[i - 1].y, mx, tp[i].y, tp[i].x, tp[i].y)
+                        }
+                        drawPath(tl, Color(0xFFC8102E), style = Stroke(width = 2.dp.toPx(), join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                        val tPaint = paint(0xFF8A0A20.toInt(), 11f, true)
+                        for (dt in dates) {
+                            val ids = (0 until n).filter { d.time[it].startsWith(dt) && !sm[it].isNaN() }
+                            if (ids.isEmpty()) continue
+                            val iMax = ids.maxByOrNull { sm[it] }!!
+                            val iMin = ids.minByOrNull { sm[it] }!!
+                            nc.drawText(Calc.fmt0(sm[iMax]) + "°", (iMax + 0.5f) * cw, ty(sm[iMax]) - 5.dp.toPx(), tPaint)
+                            if (iMin != iMax) nc.drawText(Calc.fmt0(sm[iMin]) + "°", (iMin + 0.5f) * cw, ty(sm[iMin]) + 14.dp.toPx(), tPaint)
                         }
                     }
+
+                    // Wolken-Wärmebild (weich interpoliert)
+                    drawImage(heatImg, dstOffset = androidx.compose.ui.unit.IntOffset(0, h0.toInt()), dstSize = androidx.compose.ui.unit.IntSize(w.toInt(), hh.toInt()), filterQuality = androidx.compose.ui.graphics.FilterQuality.High)
                     for (km in 2..14 step 2) {
                         val y = h0 + hh - km * 2 * cellH
                         drawLine(Color(0x33FFFFFF), Offset(0f, y), Offset(w, y), strokeWidth = 1.dp.toPx(), pathEffect = dash)
@@ -817,31 +852,31 @@ fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double) {
 
                     // Achsen: Stundenmarken unter beiden Feldern, Tagesgrenzen
                     for ((axisY, top) in listOf(base to r0, (h0 + hh) to h0)) {
-                        drawLine(Color.White, Offset(0f, axisY), Offset(w, axisY), strokeWidth = 1.dp.toPx())
+                        drawLine(Color(0xFF2A1800), Offset(0f, axisY), Offset(w, axisY), strokeWidth = 1.dp.toPx())
                         for (i in 0 until n) {
                             val hr = d.time[i].substring(11, 13).toInt()
                             if (hr % 3 == 0) {
                                 val x = i * cw
-                                drawLine(Color.White, Offset(x, axisY), Offset(x, axisY + 7.dp.toPx()), strokeWidth = 1.dp.toPx())
+                                drawLine(Color(0xFF2A1800), Offset(x, axisY), Offset(x, axisY + 7.dp.toPx()), strokeWidth = 1.dp.toPx())
                                 val lab = when (hr) { 6 -> "06"; 12 -> "12"; 18 -> "18"; 0 -> Calc.weekday(d.time[i].substring(0, 10)); else -> null }
                                 if (lab != null) nc.drawText(lab, x, axisY + 19.dp.toPx(), tick)
                             }
                         }
                         for (i in 1 until n) {
-                            if (d.time[i].substring(11, 13) == "00") drawLine(Color(0x88FFFFFF), Offset(i * cw, top), Offset(i * cw, axisY), strokeWidth = 1.dp.toPx())
+                            if (d.time[i].substring(11, 13) == "00") drawLine(Color(0x88000000), Offset(i * cw, top), Offset(i * cw, axisY), strokeWidth = 1.dp.toPx())
                         }
                     }
                     // Jetzt und Auswahl über beide Felder
                     if (nowIdx >= 0) {
                         val x = (nowIdx + 0.5f) * cw
                         val de = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 7f))
-                        drawLine(Color.White, Offset(x, r0), Offset(x, base), strokeWidth = 2.dp.toPx(), pathEffect = de)
-                        drawLine(Color.White, Offset(x, h0), Offset(x, h0 + hh), strokeWidth = 2.dp.toPx(), pathEffect = de)
+                        drawLine(Color(0xFFE5304A), Offset(x, r0), Offset(x, base), strokeWidth = 2.dp.toPx(), pathEffect = de)
+                        drawLine(Color(0xFFE5304A), Offset(x, h0), Offset(x, h0 + hh), strokeWidth = 2.dp.toPx(), pathEffect = de)
                     }
                     sel?.let { s ->
                         val x = (s + 0.5f) * cw
-                        drawLine(Color(0xFFE3B341), Offset(x, r0), Offset(x, base), strokeWidth = 2.dp.toPx())
-                        drawLine(Color(0xFFE3B341), Offset(x, h0), Offset(x, h0 + hh), strokeWidth = 2.dp.toPx())
+                        drawLine(Color(0xFF1B6BFF), Offset(x, r0), Offset(x, base), strokeWidth = 2.dp.toPx())
+                        drawLine(Color(0xFF1B6BFF), Offset(x, h0), Offset(x, h0 + hh), strokeWidth = 2.dp.toPx())
                     }
                 }
             }
@@ -851,14 +886,14 @@ fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double) {
             val t = d.time[s]
             val r = d.rain[s]
             Text(
-                Calc.weekday(t.substring(0, 10)) + " " + Calc.dm(t.substring(0, 10)) + " " + t.substring(11, 13) + " Uhr · Regen " +
+                Calc.weekday(t.substring(0, 10)) + " " + Calc.dm(t.substring(0, 10)) + " " + t.substring(11, 13) + " Uhr · " + (temps[t.substring(0, 13)]?.let { Calc.fmt0(it) + " °C · " } ?: "") + "Regen " +
                     (if (r.isNaN()) "–" else Calc.fmt1(r) + " mm/h") + " · Wolken tief " + (if (d.low[s].isNaN()) "–" else Calc.fmt0(d.low[s]) + " %") +
                     ", mittel " + (if (d.mid[s].isNaN()) "–" else Calc.fmt0(d.mid[s]) + " %") +
                     ", hoch " + (if (d.high[s].isNaN()) "–" else Calc.fmt0(d.high[s]) + " %"),
                 fontSize = 12.sp, color = LocalInk.current
             )
         } else {
-            Text("Nach rechts wischen für die kommenden Tage, antippen für Einzelwerte. Weiß gestrichelt: jetzt. Hellblauer Hintergrund: Tag.", fontSize = 12.sp, color = LocalMuted.current)
+            Text("Nach rechts wischen für die kommenden Tage, antippen für Einzelwerte. Rot gestrichelt: jetzt. Hellere Fläche: Tag. Hellblau: Regen, rote Linie: Temperatur (°C, Tageshoch/-tief beschriftet).", fontSize = 12.sp, color = LocalMuted.current)
         }
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Wolken klar", fontSize = 11.sp, color = LocalMuted.current)
