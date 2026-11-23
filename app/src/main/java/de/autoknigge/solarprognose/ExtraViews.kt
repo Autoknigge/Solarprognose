@@ -363,7 +363,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
             0 -> "Heute bis " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(lastT + 900).atZone(zone).hour, Instant.ofEpochSecond(lastT + 900).atZone(zone).minute)
             else -> "Durchschnitt $first bis ${fmt(lastT, false)}"
         }
-        Text(head + " · Erzeugung " + Calc.fmt1(prod / 1000.0) + " GW (Prozent = Anteil an der Erzeugung)", fontSize = 12.sp, color = LocalMuted.current)
+        Text(head + " · Erzeugung " + Calc.fmt1(prod / 1000.0) + " GW" + (series.v["Last"]?.let { la -> (if (s != null) la[s.coerceIn(0, n - 1)] else la.average()) }?.takeIf { it > 1000.0 }?.let { " · Last " + Calc.fmt1(it / 1000.0) + " GW" } ?: "") + " (Prozent = Anteil an der Erzeugung)", fontSize = 12.sp, color = LocalMuted.current)
         val top = MIX_GROUPS_UI.maxOf { avg(it) / prod * 100.0 }.coerceAtLeast(1.0)
         @Composable fun bar(name: String, label: String, gwOnly: Boolean = false) {
             val pct = avg(name) / prod * 100.0

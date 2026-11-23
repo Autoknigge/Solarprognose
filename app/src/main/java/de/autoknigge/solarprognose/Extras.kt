@@ -293,7 +293,7 @@ object Extras {
         val types = o.getJSONArray("production_types")
         val n = t.length()
         if (n == 0) return null
-        val keys = MIX_GROUPS + listOf("Import", "Export", "Braunkohle", "Steinkohle", "PumpLaden", "BattLaden")
+        val keys = MIX_GROUPS + listOf("Import", "Export", "Braunkohle", "Steinkohle", "PumpLaden", "BattLaden", "Last")
         val raw = keys.associateWith { DoubleArray(n) }
         var last = -1
         var haveTrade = false
@@ -342,6 +342,7 @@ object Extras {
             }
         }
         if (last < 0) return null
+        loadArr?.let { la0 -> for (i in 0 until minOf(n, la0.length())) if (!la0.isNull(i)) raw["Last"]!![i] = la0.getDouble(i) }
         // Handel über alle Grenzen einzeln (brutto): Import = Summe aller Einfuhren, Export = Summe aller Ausfuhren.
         // Die Gesamtzeile aus public_power ist nur der Saldo und würde Import und Export gegeneinander aufrechnen.
         if (cbet != null && cbet.isNotEmpty()) {
@@ -432,6 +433,7 @@ object Extras {
         val add = ((now - lastT) / 900).toInt().coerceAtMost(16)
         if (add < 1) return s
         val solar = forecastMap("solar", day)
+        val loadFc = forecastMap("load", day)
         val wind = java.util.TreeMap<Long, Double>()
         for (ty in listOf("wind_onshore", "wind_offshore")) for ((k, v) in forecastMap(ty, day)) wind[k] = (wind[k] ?: 0.0) + v
         if (solar.isEmpty() && wind.isEmpty()) return s
@@ -443,7 +445,7 @@ object Extras {
         val v2 = HashMap<String, DoubleArray>()
         for ((k, arr) in s.v) {
             val na = DoubleArray(n + add) { if (it < n) arr[it] else arr[n - 1] }
-            val fc = when (k) { "Solar" -> solar; "Wind" -> wind; else -> null }
+            val fc = when (k) { "Solar" -> solar; "Wind" -> wind; "Last" -> loadFc; else -> null }
             if (fc != null && fc.isNotEmpty()) for (i in n until n + add) at(fc, t2[i])?.let { na[i] = it.coerceAtLeast(0.0) }
             v2[k] = na
         }
@@ -453,7 +455,7 @@ object Extras {
         var sT = s.shareT
         val mi = s.t.indexOf(s.shareT)
         val lastI = n + add - 1
-        var load: Double? = at(forecastMap("load", day), t2[lastI])?.takeIf { it > 1000.0 }
+        var load: Double? = at(loadFc, t2[lastI])?.takeIf { it > 1000.0 }
         if (load == null && mi >= 0 && s.solarShare != null && s.solarShare > 0.5) load = (s.v["Solar"]?.get(mi) ?: 0.0) / s.solarShare * 100.0
         if (load != null && load > 1000.0) {
             fun g(k: String) = v2[k]?.get(lastI) ?: 0.0
