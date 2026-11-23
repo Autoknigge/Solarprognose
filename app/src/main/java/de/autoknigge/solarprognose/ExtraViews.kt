@@ -314,7 +314,7 @@ fun PriceCard(prices: List<PriceHour>, nowSec: Long) {
         PriceChart(prices = prices, nowSec = nowSec, selected = sel, onSelect = { sel = it })
         Text(
             (if (!hasTomorrow) "Die Preise für morgen veröffentlicht die Börse gegen 13 Uhr. " else "") +
-                "Netto-Börsenpreis (Day-Ahead, Gebotszone DE-LU) ohne Steuern, Abgaben und Netzentgelte. Dein Stromtarif weicht davon ab.",
+                "Netto-Börsenpreis (Day-Ahead, Gebotszone DE-LU) ohne Steuern, Abgaben und Netzentgelte.",
             fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
         )
     }

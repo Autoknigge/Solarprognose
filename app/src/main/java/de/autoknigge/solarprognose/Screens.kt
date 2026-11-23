@@ -174,7 +174,8 @@ fun Tile(
     modifier: Modifier = Modifier,
     icon: WeatherKind? = null,
     bg: androidx.compose.ui.graphics.Color = Panel2,
-    mutedColor: androidx.compose.ui.graphics.Color = Muted
+    mutedColor: androidx.compose.ui.graphics.Color = Muted,
+    inkColor: androidx.compose.ui.graphics.Color = Ink
 ) {
     val shape = RoundedCornerShape(14.dp)
     Box(
@@ -187,7 +188,7 @@ fun Tile(
         Column {
             Text(label.uppercase(Locale.GERMAN), fontSize = 11.sp, letterSpacing = 0.8.sp, color = mutedColor)
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(value, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Ink)
+                Text(value, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = inkColor)
                 if (unit != null) Text(" $unit", fontSize = 13.sp, color = mutedColor, modifier = Modifier.padding(bottom = 4.dp))
             }
             Text(note, fontSize = 12.sp, color = mutedColor, lineHeight = 16.sp)
@@ -383,8 +384,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         Modifier.weight(1f).fillMaxHeight(), icon = t1?.let { Extras.kindOf(it) }, bg = TileTomorrow, mutedColor = Color(0xFFFFEBD6))
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Tile(dayList.size.toString() + " Tage", Calc.fmt0(total), "kWh", "Ø " + Calc.fmt1(total / dayList.size) + " kWh pro Tag", Modifier.weight(1f).fillMaxHeight())
-                    Tile("Bester Tag", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight(), bg = Color(0xFFEE9F27), mutedColor = Color(0xFF4A2E00))
+                    Tile("Summe " + dayList.size.toString() + " Tage", Calc.fmt0(total), "kWh", "Ø " + Calc.fmt1(total / dayList.size) + " kWh pro Tag", Modifier.weight(1f).fillMaxHeight())
+                    Tile(dayList.size.toString() + "-Tage-Maximum am", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight(), bg = Color(0xFFEE9F27), mutedColor = Color.Black, inkColor = Color.Black)
                 }
 
                 val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0) }
@@ -541,7 +542,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
             }
 
             Text(
-                "Wetterdaten: Open-Meteo.com (CC BY 4.0). Jahreswerte: PVGIS, Europäische Kommission (JRC). Börsenpreise: Energy-Charts, Fraunhofer ISE (CC BY 4.0). Die Werte sind eine Schätzung ohne Verschattung und Schnee.",
+                "Wetterdaten: Open-Meteo.com (CC BY 4.0). Jahreswerte: PVGIS, Europäische Kommission (JRC). Börsenpreise: Energy-Charts, Fraunhofer ISE (CC BY 4.0).",
                 fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
             )
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
