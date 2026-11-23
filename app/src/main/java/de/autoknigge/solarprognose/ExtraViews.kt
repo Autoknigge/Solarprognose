@@ -692,9 +692,12 @@ fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double, temp
         val panel = Color(0xFFC98414)
         val dayBand = Color(0xFFF7C46A)
         val ink = 0xFF2A1800.toInt()
-        val lo = Color(0xFFE2E2E2)
-        val hi = Color(0xFF121212)
+        val lo = Color(0xFF3E77B6)
+        val hi = Color(0xFF000000)
         val tempArr = remember(d, temps) { DoubleArray(n) { i -> temps[d.time[i].substring(0, 13)] ?: Double.NaN } }
+        val tvAll = tempArr.filter { !it.isNaN() }
+        val tLoAll = if (tvAll.isEmpty()) 0.0 else Math.floor(tvAll.min()) - 1
+        val tHiAll = if (tvAll.isEmpty()) 1.0 else Math.ceil(tvAll.max()) + 1
         val heatImg = remember(d) {
             val bmp = android.graphics.Bitmap.createBitmap(n, PROFILE_ROWS, android.graphics.Bitmap.Config.ARGB_8888)
             for (i in 0 until n) for (r in 0 until PROFILE_ROWS) {
@@ -821,8 +824,8 @@ fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double, temp
                             for (j in maxOf(0, i - 2)..minOf(n - 1, i + 2)) if (!tempArr[j].isNaN()) { sum += tempArr[j]; c++ }
                             if (c > 0) sum / c else Double.NaN
                         }
-                        val tLo = Math.floor(tv.min()) - 1
-                        val tHi = Math.ceil(tv.max()) + 1
+                        val tLo = tLoAll
+                        val tHi = tHiAll
                         fun ty(t: Double) = r0 + rh * 0.92f - ((t - tLo) / (tHi - tLo) * rh * 0.84f).toFloat()
                         val tp = (0 until n).filter { !sm[it].isNaN() }.map { Offset((it + 0.5f) * cw, ty(sm[it])) }
                         val tl = Path()
@@ -879,6 +882,25 @@ fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double, temp
                         drawLine(Color(0xFF1B6BFF), Offset(x, h0), Offset(x, h0 + hh), strokeWidth = 2.dp.toPx())
                     }
                 }
+            }
+            if (tvAll.size > 3) Canvas(Modifier.size(width = 34.dp, height = totalH)) {
+                val tp = android.graphics.Paint().apply { isAntiAlias = true; color = 0xFF8A0A20.toInt(); textSize = 11.sp.toPx(); textAlign = android.graphics.Paint.Align.LEFT; isFakeBoldText = true }
+                val nc = drawContext.canvas.nativeCanvas
+                val r0 = hdrH.toPx()
+                val rh = rainH.toPx()
+                val span = tHiAll - tLoAll
+                val st = if (span <= 8) 2.0 else if (span <= 20) 5.0 else 10.0
+                var t = Math.ceil(tLoAll / st) * st
+                while (t <= tHiAll) {
+                    val y = r0 + rh * 0.92f - ((t - tLoAll) / span * rh * 0.84f).toFloat()
+                    nc.drawText(Calc.fmt0(t) + "°", 4.dp.toPx(), y + 4.dp.toPx(), tp)
+                    t += st
+                }
+                nc.save()
+                nc.rotate(90f, 28.dp.toPx(), r0 + rh / 2)
+                tp.textAlign = android.graphics.Paint.Align.CENTER
+                nc.drawText("Temperatur (°C)", 28.dp.toPx(), r0 + rh / 2 + 4.dp.toPx(), tp)
+                nc.restore()
             }
         }
         val s = sel
