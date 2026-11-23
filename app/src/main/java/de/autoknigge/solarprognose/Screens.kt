@@ -234,13 +234,6 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
     val sel = vm.selectedPlants
     val group = sel.size > 1
     var showGroupDialog by remember { mutableStateOf(false) }
-    val forecast = remember(vm.raws, sel) { Calc.forecastFor(vm.raws, sel, false) }
-    // Mit 2 Tagen Rückblick für Ertrag pro Tag, Leistung, Bewölkung/Temperatur und Tabelle
-    val full = remember(vm.raws, sel) { Calc.forecastFor(vm.raws, sel, true) }
-    var range by rememberSaveable { mutableIntStateOf(1) }
-    var selHour by remember(plant.id) { mutableStateOf<Int?>(null) }
-    var selDay by remember(plant.id) { mutableStateOf<Int?>(null) }
-    var selWx by remember(plant.id) { mutableStateOf<Int?>(null) }
     var tick by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -248,6 +241,22 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
             tick++
         }
     }
+    // Tageswechsel um 0 Uhr: Prognose sofort neu zuschneiden und frisch laden
+    val dayKey = remember(tick) { java.time.LocalDate.now().toString() }
+    var lastDay by remember { mutableStateOf(dayKey) }
+    LaunchedEffect(dayKey) {
+        if (dayKey != lastDay) {
+            lastDay = dayKey
+            vm.refresh()
+        }
+    }
+    val forecast = remember(vm.raws, sel, dayKey) { Calc.forecastFor(vm.raws, sel, false) }
+    // Mit 2 Tagen Rückblick für Ertrag pro Tag, Leistung, Bewölkung/Temperatur und Tabelle
+    val full = remember(vm.raws, sel, dayKey) { Calc.forecastFor(vm.raws, sel, true) }
+    var range by rememberSaveable { mutableIntStateOf(1) }
+    var selHour by remember(plant.id) { mutableStateOf<Int?>(null) }
+    var selDay by remember(plant.id) { mutableStateOf<Int?>(null) }
+    var selWx by remember(plant.id) { mutableStateOf<Int?>(null) }
     val nowC = remember(forecast, tick) { forecast?.let { Calc.nowCoord(it) } }
     val nowFull = remember(full, tick) { full?.let { Calc.nowCoord(it) } }
     val nowSec = remember(tick) { System.currentTimeMillis() / 1000 }
