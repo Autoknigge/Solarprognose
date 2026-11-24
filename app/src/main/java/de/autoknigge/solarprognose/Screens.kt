@@ -433,9 +433,13 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 fun scaleHours(f0: Forecast): Forecast {
                     val ratio = f0.days.associate { d -> d.date to (if (d.kwh > 0.0) adjDay(d).kwh / d.kwh else 1.0) }
                     val cm = modelsMap?.get("$selModel#cloud"); val tm = modelsMap?.get("$selModel#temp"); val rm = modelsMap?.get("$selModel#rain")
+                    val sn = modelsMap?.get("$selModel#snow"); val co = modelsMap?.get("$selModel#code"); val gu = modelsMap?.get("$selModel#gust"); val uvm = modelsMap?.get("$selModel#uv")
                     val hrs = f0.hours.map { h ->
                         val r = ratio[h.date] ?: 1.0
-                        h.copy(power = h.power * r, cloud = cm?.get(h.time) ?: h.cloud, temp = tm?.get(h.time) ?: h.temp, precip = rm?.get(h.time) ?: h.precip)
+                        h.copy(
+                            power = h.power * r, cloud = cm?.get(h.time) ?: h.cloud, temp = tm?.get(h.time) ?: h.temp, precip = rm?.get(h.time) ?: h.precip,
+                            snowCm = sn?.get(h.time) ?: h.snowCm, code = co?.get(h.time)?.toInt() ?: h.code, gust = gu?.get(h.time) ?: h.gust, uv = uvm?.get(h.time) ?: h.uv
+                        )
                     }
                     val days2 = f0.days.map { d ->
                         val dh = hrs.filter { it.date == d.date }
@@ -445,7 +449,12 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                             dd.copy(
                                 cloudAvg = if (day.isEmpty()) dd.cloudAvg else day.map { it.cloud }.average(),
                                 tempAvg = if (tm == null) dd.tempAvg else dh.map { it.temp }.average(),
-                                rainMm = if (rm == null) dd.rainMm else dh.sumOf { it.precip }
+                                rainMm = if (rm == null) dd.rainMm else dh.sumOf { it.precip },
+                                snowCm = if (sn == null) dd.snowCm else dh.sumOf { it.snowCm },
+                                thunder = if (co == null) dd.thunder else dh.any { it.code == 95 || it.code == 96 || it.code == 99 },
+                                hail = if (co == null) dd.hail else dh.any { it.code == 96 || it.code == 99 },
+                                gustMax = if (gu == null) dd.gustMax else dh.maxOf { it.gust },
+                                uvMax = if (uvm == null) dd.uvMax else dh.maxOf { it.uv }
                             )
                         }
                     }
