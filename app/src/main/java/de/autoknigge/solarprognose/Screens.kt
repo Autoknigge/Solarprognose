@@ -370,7 +370,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 fun adjDay(d: Day): Day {
                     val sun = modelsMap?.get("$selModel#sun")?.get(d.date)
                     val d2 = if (sun != null) d.copy(sunH = sun) else d
-                    return cmp(d, selModel)?.let { d2.copy(kwh = it) } ?: d2
+                    return cmp(d, selModel)?.let { d2.copy(kwh = it, peak = if (d.kwh > 0.0) d.peak * it / d.kwh else d.peak) } ?: d2
                 }
                 val dayListA = dayList.map { adjDay(it) }
                 val total = dayListA.sumOf { it.kwh }
@@ -430,8 +430,12 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 })
                 else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, satNote = "Modell " + selName + ". " + (spread(d0) ?: "") + " „Bisher“ aus dem Wetter berechnet, nicht gemessen.", nowKw = nowKw, sunTotal = adjDay(d0).sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } * (if (d0.sunH > 0.0) (adjDay(d0).sunH ?: d0.sunH) / d0.sunH else 1.0) })
 
-                val dayF = (full ?: forecast).let { f0 -> f0.copy(days = f0.days.map { adjDay(it) }) }
-                val hourF = if (range == -2) dayF else forecast
+                fun scaleHours(f0: Forecast): Forecast {
+                    val ratio = f0.days.associate { d -> d.date to (if (d.kwh > 0.0) adjDay(d).kwh / d.kwh else 1.0) }
+                    return f0.copy(days = f0.days.map { adjDay(it) }, hours = f0.hours.map { h -> val r = ratio[h.time.take(10)] ?: 1.0; if (r == 1.0) h else h.copy(power = h.power * r) })
+                }
+                val dayF = scaleHours(full ?: forecast)
+                val hourF = if (range == -2) dayF else scaleHours(forecast)
                 val hourNow = if (range == -2 && full != null) nowFull else nowC
                 val nowIdx = hourNow?.let { (Math.floor(it).toInt() + 1).coerceIn(0, (hourF.hours.size - 1).coerceAtLeast(0)) }
                 val hourCount = when (range) {
