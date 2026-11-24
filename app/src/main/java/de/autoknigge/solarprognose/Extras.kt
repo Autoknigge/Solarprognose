@@ -456,6 +456,7 @@ object Extras {
         val mi = s.t.indexOf(s.shareT)
         val lastI = n + add - 1
         var load: Double? = at(loadFc, t2[lastI])?.takeIf { it > 1000.0 }
+        if (load == null) load = v2["Last"]?.get(lastI)?.takeIf { it > 1000.0 }
         if (load == null && mi >= 0 && s.solarShare != null && s.solarShare > 0.5) load = (s.v["Solar"]?.get(mi) ?: 0.0) / s.solarShare * 100.0
         if (load != null && load > 1000.0) {
             fun g(k: String) = v2[k]?.get(lastI) ?: 0.0
