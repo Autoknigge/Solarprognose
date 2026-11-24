@@ -218,7 +218,7 @@ object Extras {
     private fun pricesJson(): String {
         if (Api.hasProxy) return Api.get("${Api.proxy}/prices?bzn=DE-LU", true)
         val today = LocalDate.now(berlin)
-        return ecGet("https://api.energy-charts.info/price?bzn=DE-LU&start=$today&end=${today.plusDays(2)}", false)
+        return ecGet("https://api.energy-charts.info/price?bzn=DE-LU&start=$today&end=${today.plusDays(2)}")
     }
 
     /** Fasst Viertelstundenwerte zu Stundenmittel zusammen. EUR/MWh geteilt durch 10 ergibt ct/kWh. Nur ab heute 0 Uhr. */
@@ -455,7 +455,7 @@ object Extras {
     /** Anteil Erneuerbarer/Solar an der Last laut Energy-Charts-Prognose (ren_share_forecast) zum Zeitpunkt ts: Paar (ren %, solar %) oder null. */
     private fun renShareAt(ts: Long): Pair<Double, Double?>? {
         try {
-            val o = JSONObject(ecGet("https://api.energy-charts.info/ren_share_forecast?country=de", false))
+            val o = JSONObject(ecGet("https://api.energy-charts.info/ren_share_forecast?country=de"))
             val t = o.getJSONArray("unix_seconds")
             val r = o.optJSONArray("ren_share") ?: return null
             val so = o.optJSONArray("solar_share")
