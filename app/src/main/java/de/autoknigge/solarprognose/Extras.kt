@@ -558,7 +558,7 @@ object Extras {
     suspend fun loadModels(p: Plant): Map<String, Map<String, Double>> = withContext(Dispatchers.IO) {
         val ids = COMPARE_MODELS.joinToString(",") { it.first }
         val h = JSONObject(
-            Api.get("https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&hourly=shortwave_radiation,sunshine_duration&models=$ids&forecast_days=7&timezone=auto", false)
+            Api.get("https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&hourly=shortwave_radiation,sunshine_duration,cloud_cover,temperature_2m,precipitation&models=$ids&forecast_days=7&timezone=auto", false)
         ).getJSONObject("hourly")
         val t = h.getJSONArray("time")
         val out = HashMap<String, Map<String, Double>>()
@@ -570,6 +570,12 @@ object Extras {
                 m[d] = (m[d] ?: 0.0) + a.getDouble(i)
             }
             out[id] = m
+            for ((suffix, key) in listOf("cloud" to "cloud_cover", "temp" to "temperature_2m", "rain" to "precipitation")) {
+                val ha = h.optJSONArray(key + "_" + id) ?: continue
+                val hm = HashMap<String, Double>()
+                for (i in 0 until minOf(t.length(), ha.length())) if (!ha.isNull(i)) hm[t.getString(i)] = ha.getDouble(i)
+                out["$id#$suffix"] = hm
+            }
             val sa = h.optJSONArray("sunshine_duration_$id")
             if (sa != null) {
                 val sm = HashMap<String, Double>()
