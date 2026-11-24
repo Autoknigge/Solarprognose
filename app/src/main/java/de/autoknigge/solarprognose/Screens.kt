@@ -444,7 +444,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         Extras.COMPARE_MODELS.map { (id, nm) -> ModelRow(id, nm, cmp(mt0, id), cmp(mt1, id), mm["$id#sun"]?.get(mt0.date), mt1?.let { mm["$id#sun"]?.get(it.date) }) },
                         Calc.weekday(mt0.date) + " " + Calc.dm(mt0.date), mt1?.let { Calc.weekday(it.date) + " " + Calc.dm(it.date) } ?: "",
                         selModel
-                    ) { id -> selModel = id; ctx.getSharedPreferences("sp_ui", 0).edit().putString("model", id).apply() }
+                    ) { id -> selModel = id; ctxUi.getSharedPreferences("sp_ui", 0).edit().putString("model", id).apply() }
                 }
                 SectionCard(title = "Ertrag pro Tag (kWh)") {
                     val sd = selDay
