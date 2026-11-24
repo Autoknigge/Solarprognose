@@ -218,7 +218,7 @@ object Extras {
     private fun pricesJson(): String {
         if (Api.hasProxy) return Api.get("${Api.proxy}/prices?bzn=DE-LU", true)
         val today = LocalDate.now(berlin)
-        return Api.get("https://api.energy-charts.info/price?bzn=DE-LU&start=$today&end=${today.plusDays(2)}", false)
+        return ecGet("https://api.energy-charts.info/price?bzn=DE-LU&start=$today&end=${today.plusDays(2)}", false)
     }
 
     /** Fasst Viertelstundenwerte zu Stundenmittel zusammen. EUR/MWh geteilt durch 10 ergibt ct/kWh. Nur ab heute 0 Uhr. */
@@ -409,14 +409,44 @@ object Extras {
         return m
     }
 
+    // Energy-Charts erlaubt nur ca. 2 Anfragen pro Minute (Burst 4): einfacher Token-Bucket, damit keine Antworten mit HTTP 429 verloren gehen
+    private val ecLock = Any()
+    private var ecTokens = 4.0
+    private var ecLast = System.currentTimeMillis()
+
+    private fun ecGet(url: String): String {
+        var wait = 0L
+        synchronized(ecLock) {
+            val now = System.currentTimeMillis()
+            ecTokens = minOf(4.0, ecTokens + (now - ecLast) / 30000.0)
+            ecLast = now
+            if (ecTokens < 1.0) wait = ((1.0 - ecTokens) * 30000.0).toLong()
+            ecTokens -= 1.0
+        }
+        if (wait > 0) Thread.sleep(wait)
+        return try {
+            Api.get(url, false)
+        } catch (e: java.io.IOException) {
+            if (e.message?.contains("429") == true) {
+                Thread.sleep(30000)
+                Api.get(url, false)
+            } else throw e
+        }
+    }
+
+    private val fcCache = HashMap<String, Pair<Long, java.util.TreeMap<Long, Double>>>()
+
     /** Prognosereihe (MW) je Zeitstempel aus public_power_forecast; leer bei Fehlern. */
     private fun forecastMap(type: String, day: LocalDate): java.util.TreeMap<Long, Double> {
+        val ck = "$type|$day"
+        synchronized(fcCache) { fcCache[ck] }?.let { if (System.currentTimeMillis() - it.first < 25L * 60 * 1000) return it.second }
         val m = java.util.TreeMap<Long, Double>()
         try {
-            val o = JSONObject(Api.get("https://api.energy-charts.info/public_power_forecast?country=de&production_type=$type&forecast_type=current&start=$day&end=$day", false))
+            val o = JSONObject(ecGet("https://api.energy-charts.info/public_power_forecast?country=de&production_type=$type&forecast_type=current&start=$day&end=$day"))
             val t = o.getJSONArray("unix_seconds")
             val d = o.optJSONArray("forecast_values") ?: o.optJSONArray("data") ?: return m
             for (i in 0 until minOf(t.length(), d.length())) if (!d.isNull(i)) m[t.getLong(i)] = d.getDouble(i)
+            if (m.isNotEmpty()) synchronized(fcCache) { fcCache[ck] = System.currentTimeMillis() to m }
         } catch (e: Exception) {
         }
         return m
@@ -425,7 +455,7 @@ object Extras {
     /** Anteil Erneuerbarer/Solar an der Last laut Energy-Charts-Prognose (ren_share_forecast) zum Zeitpunkt ts: Paar (ren %, solar %) oder null. */
     private fun renShareAt(ts: Long): Pair<Double, Double?>? {
         try {
-            val o = JSONObject(Api.get("https://api.energy-charts.info/ren_share_forecast?country=de", false))
+            val o = JSONObject(ecGet("https://api.energy-charts.info/ren_share_forecast?country=de", false))
             val t = o.getJSONArray("unix_seconds")
             val r = o.optJSONArray("ren_share") ?: return null
             val so = o.optJSONArray("solar_share")
@@ -449,8 +479,10 @@ object Extras {
         val lastT = s.t[n - 1]
         val add = ((now - lastT) / 900).toInt().coerceAtMost(16)
         if (add < 1) return s
-        val solar = forecastMap("solar", day)
-        val loadFc = forecastMap("load", day)
+        val hourNow = java.time.ZonedDateTime.now(berlin).hour
+        val solarNow = s.v["Solar"]?.get(n - 1) ?: 0.0
+        val solar = if (solarNow < 50.0 && (hourNow >= 17 || hourNow < 7)) java.util.TreeMap<Long, Double>() else forecastMap("solar", day)
+        val loadFc = java.util.TreeMap<Long, Double>()
         val wind = java.util.TreeMap<Long, Double>()
         for (ty in listOf("wind_onshore", "wind_offshore")) for ((k, v) in forecastMap(ty, day)) wind[k] = (wind[k] ?: 0.0) + v
         if (solar.isEmpty() && wind.isEmpty()) return s
@@ -497,9 +529,9 @@ object Extras {
         val today = LocalDate.now(berlin)
         fun fetch(from: LocalDate, to: LocalDate, max: Int): MixSeries? {
             val base = "https://api.energy-charts.info"
-            val pj = Api.get("$base/public_power?country=de&start=$from&end=$to", false)
+            val pj = ecGet("$base/public_power?country=de&start=$from&end=$to")
             val trade = try {
-                cbetMap(Api.get("$base/cbet?country=de&start=$from&end=$to", false))
+                cbetMap(ecGet("$base/cbet?country=de&start=$from&end=$to"))
             } catch (e: Exception) {
                 null
             }
