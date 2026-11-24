@@ -552,6 +552,28 @@ object Extras {
         EnsRaw(det, members)
     }
 
+    val COMPARE_MODELS = listOf("icon_seamless" to "ICON", "ecmwf_ifs025" to "ECMWF", "gfs_seamless" to "GFS", "meteofrance_seamless" to "Arpège")
+
+    /** Tagessummen der Einstrahlung je Modell: Modell-Id -> Datum -> Wh/m². */
+    suspend fun loadModels(p: Plant): Map<String, Map<String, Double>> = withContext(Dispatchers.IO) {
+        val ids = COMPARE_MODELS.joinToString(",") { it.first }
+        val h = JSONObject(
+            Api.get("https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&hourly=shortwave_radiation&models=$ids&forecast_days=3&timezone=auto", false)
+        ).getJSONObject("hourly")
+        val t = h.getJSONArray("time")
+        val out = HashMap<String, Map<String, Double>>()
+        for ((id, _) in COMPARE_MODELS) {
+            val a = h.optJSONArray("shortwave_radiation_$id") ?: continue
+            val m = HashMap<String, Double>()
+            for (i in 0 until minOf(t.length(), a.length())) if (!a.isNull(i)) {
+                val d = t.getString(i).substring(0, 10)
+                m[d] = (m[d] ?: 0.0) + a.getDouble(i)
+            }
+            out[id] = m
+        }
+        out
+    }
+
     class ObsCloud(val pct: Double, val station: String?)
 
     /** Beobachtete Bewölkung (DWD über Bright Sky), auch nachts verfügbar. */

@@ -158,6 +158,28 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
 
 /** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest, kompakt. */
 @Composable
+fun ModelCard(rows: List<Triple<String, Double?, Double?>>, label0: String, label1: String) {
+    SectionCard(title = "Modellvergleich (kWh, ohne Korrektur)") {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(" ", fontSize = 12.sp)
+                Text(label0, fontSize = 13.sp, color = Muted)
+                Text(label1, fontSize = 13.sp, color = Muted)
+            }
+            for ((name, v0, v1) in rows) Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(name, fontSize = 12.sp, color = Gold, fontWeight = FontWeight.SemiBold)
+                Text(v0?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = Ink, fontWeight = FontWeight.Bold)
+                Text(v1?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = Ink, fontWeight = FontWeight.Bold)
+            }
+        }
+        Text(
+            "Gleiche Anlage, die Einstrahlung jedes Modells auf die Prognose umgerechnet (ICON = Grundwert). Große Abstände heißen: die Wetterlage ist unsicher.",
+            fontSize = 11.sp, color = Muted, lineHeight = 15.sp
+        )
+    }
+}
+
+@Composable
 fun TomorrowCard(total: Double, sunTotal: Double?, firstKwh: String?) {
     SectionCard(title = "") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

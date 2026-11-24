@@ -473,6 +473,21 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     else -> 72
                 }
 
+                vm.models[plant.id]?.let { mm ->
+                    val ref = mm["icon_seamless"]
+                    fun cmp(d: Day?, id: String): Double? {
+                        if (d == null || ref == null) return null
+                        val e = mm[id]?.get(d.date) ?: return null
+                        val r = ref[d.date] ?: return null
+                        return if (r < 50.0) null else d.kwh * e / r
+                    }
+                    val mt0 = dayList[0]
+                    val mt1 = dayList.getOrNull(1)
+                    ModelCard(
+                        Extras.COMPARE_MODELS.map { (id, nm) -> Triple(nm, cmp(mt0, id), cmp(mt1, id)) },
+                        Calc.weekday(mt0.date) + " " + Calc.dm(mt0.date), mt1?.let { Calc.weekday(it.date) + " " + Calc.dm(it.date) } ?: ""
+                    )
+                }
                 SectionCard(title = "Ertrag pro Tag (kWh)") {
                     val sd = selDay
                     Text(
