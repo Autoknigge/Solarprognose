@@ -43,6 +43,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Börsenpreise ab heute, falls geladen. */
     var prices by mutableStateOf<List<PriceHour>?>(null)
     var ytd by mutableStateOf<Map<String, YtdData>>(emptyMap())
+    var sat by mutableStateOf<Map<String, Map<String, Double>>>(emptyMap())
         private set
     var profile by mutableStateOf<Map<String, ProfileData>>(emptyMap())
         private set
@@ -100,6 +101,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 try {
                     ytd = ytd + (p.id to Extras.loadYtd(p))
+                } catch (e: Exception) {
+                }
+                try {
+                    sat = sat + (p.id to Extras.loadSatGti(p))
                 } catch (e: Exception) {
                 }
             }

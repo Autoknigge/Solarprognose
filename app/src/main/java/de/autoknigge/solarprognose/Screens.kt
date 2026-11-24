@@ -350,7 +350,21 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val t1 = dayList.getOrNull(1)
                 val total = dayList.sumOf { it.kwh }
                 val best = dayList.maxByOrNull { it.kwh } ?: t0
-                val rest = nowC?.let { Calc.remainingToday(forecast, it) }
+                val restModel = nowC?.let { Calc.remainingToday(forecast, it) }
+                // Satelliten-Korrektur: nur wenn die gemessene Einstrahlung heute deutlich (> 25 %) unter dem Modell liegt
+                val satMap = vm.sat[plant.id]
+                val satFactor: Double? = if (satMap == null || nowC == null || eveningSwitch) null else {
+                    var sm = 0.0; var ss = 0.0; var cnt = 0
+                    for (i in 0..Math.floor(nowC).toInt().coerceAtMost(forecast.hours.size - 1)) {
+                        val h = forecast.hours[i]
+                        if (h.date != d0.date || h.gti < 150.0) continue
+                        val sv = satMap[h.time] ?: continue
+                        sm += h.gti; ss += sv; cnt++
+                    }
+                    if (cnt >= 2 && sm > 0.0 && ss / sm < 0.75) (ss / sm).coerceIn(0.05, 1.0) else null
+                }
+                val fk = satFactor ?: 1.0
+                val rest = restModel?.let { it * fk }
 
                 val uvNow = nowC?.let { c ->
                     val cur = forecast.hours.getOrNull(Math.floor(c).toInt() + 1)?.uv ?: 0.0
@@ -378,7 +392,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Tile(if (eveningSwitch) "Morgen" else "Heute", Calc.fmt1(t0.kwh), "kWh", if (eveningSwitch) "Spitze " + Calc.fmt0(t0.peak) + " W gegen " + t0.peakHour + " Uhr" else if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
+                    Tile(if (eveningSwitch) "Morgen" else "Heute", Calc.fmt1(if (eveningSwitch) t0.kwh else t0.kwh * fk), "kWh", if (eveningSwitch) "Spitze " + Calc.fmt0(t0.peak) + " W gegen " + t0.peakHour + " Uhr" else if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
                         Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(t0), bg = TileToday, mutedColor = Color(0xFFFFE6DA))
                     Tile(if (eveningSwitch) "Übermorgen" else "Morgen", t1?.let { Calc.fmt1(it.kwh) } ?: "–", "kWh", t1?.let { "Spitze " + Calc.fmt0(it.peak) + " W gegen " + it.peakHour + " Uhr" } ?: "",
                         Modifier.weight(1f).fillMaxHeight(), icon = t1?.let { Extras.kindOf(it) }, bg = TileTomorrow, mutedColor = Color(0xFFFFEBD6))
@@ -388,7 +402,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Tile(dayList.size.toString() + "-Tage-Maximum am", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight(), bg = Color(0xFFEE9F27), mutedColor = Color.Black, inkColor = Color.Black)
                 }
 
-                val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0) }
+                val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0)?.times(fk) }
                 if (eveningSwitch && d1 != null) TomorrowCard(d1.kwh, d1.sunH, run {
                     var cum = 0.0
                     var res: String? = null
@@ -403,7 +417,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                     res
                 })
-                else if (rest != null) TodayCard(total = d0.kwh, rest = rest, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
+                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher nur " + Calc.fmt0(it * 100) + " % des Modells). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." }, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
 
                 val dayF = full ?: forecast
                 val hourF = if (range == -2) dayF else forecast

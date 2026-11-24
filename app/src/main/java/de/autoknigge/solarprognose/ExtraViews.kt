@@ -173,7 +173,7 @@ fun TomorrowCard(total: Double, sunTotal: Double?, firstKwh: String?) {
 }
 
 @Composable
-fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sunTotal: Double? = null, sunRest: Double? = null) {
+fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sunTotal: Double? = null, sunRest: Double? = null, satNote: String? = null) {
     val done = (total - rest).coerceAtLeast(0.0)
     val frac = if (total > 0.0) (done / total).toFloat().coerceIn(0f, 1f) else 0f
     SectionCard(title = "") {
@@ -189,7 +189,7 @@ fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sunTotal: Doub
         }
         Text(
             (if (sunTotal != null) "Sonne heute " + Calc.fmt1(sunTotal) + " h" + (if (sunRest != null) ", noch " + Calc.fmt1(sunRest) + " h" else "") + " · " else "") +
-                "„Bisher“ aus dem Wetter berechnet, nicht gemessen.",
+                (if (satNote != null) satNote else "„Bisher“ aus dem Wetter berechnet, nicht gemessen."),
             fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
     }

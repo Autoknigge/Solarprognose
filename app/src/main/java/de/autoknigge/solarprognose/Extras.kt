@@ -526,6 +526,23 @@ object Extras {
         d
     }
 
+    /** Gemessene Einstrahlung (Satellit, auf die Modulfläche gerechnet) für heute: Zeit "yyyy-MM-ddTHH:mm" -> W/m². */
+    suspend fun loadSatGti(p: Plant): Map<String, Double> = withContext(Dispatchers.IO) {
+        val today = LocalDate.now()
+        val o = JSONObject(
+            Api.get(
+                "https://satellite-api.open-meteo.com/v1/archive?latitude=${p.lat}&longitude=${p.lon}&tilt=${p.tilt}&azimuth=${p.az}" +
+                    "&hourly=global_tilted_irradiance&models=satellite_radiation_seamless&start_date=$today&end_date=$today&timezone=auto", false
+            )
+        )
+        val h = o.getJSONObject("hourly")
+        val t = h.getJSONArray("time")
+        val g = h.getJSONArray("global_tilted_irradiance")
+        val m = HashMap<String, Double>()
+        for (i in 0 until minOf(t.length(), g.length())) if (!g.isNull(i)) m[t.getString(i)] = g.getDouble(i)
+        m
+    }
+
     private val ytdCache = HashMap<String, Pair<Long, YtdData>>()
 
     /** Dieses Jahr bisher je Monat: Archiv (bis etwa vor 5 Tagen), die letzten Tage aus der Prognose-Schnittstelle (past_days). */
