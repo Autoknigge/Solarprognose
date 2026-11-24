@@ -160,7 +160,7 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
 /** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest, kompakt. */
 @Composable
 fun ModelCard(rows: List<Triple<String, Double?, Double?>>, label0: String, label1: String) {
-    SectionCard(title = "Modellvergleich (kWh, ohne Korrektur)") {
+    SectionCard(title = "Modellvergleich (reine Modellwerte, kWh)") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(" ", fontSize = 12.sp)
@@ -174,7 +174,7 @@ fun ModelCard(rows: List<Triple<String, Double?, Double?>>, label0: String, labe
             }
         }
         Text(
-            "Gleiche Anlage, die Einstrahlung jedes Modells auf die Prognose umgerechnet (ICON = Grundwert). Große Abstände heißen: die Wetterlage ist unsicher.",
+            "Gleiche Anlage, die Einstrahlung jedes Modells auf die Prognose umgerechnet (ICON = Grundwert). Große Abstände heißen: die Wetterlage ist unsicher. Die Kacheln oben und die Balken zeigen die korrigierten Werte.",
             fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
     }
