@@ -728,7 +728,7 @@ private fun profileCloudAt(d: ProfileData, i: Int, hm: Double): Double {
 fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double, temps: Map<String, Double> = emptyMap()) {
     SectionCard(
         title = "Niederschlag und Wolken",
-        bg = Color(0xFFDC6601), borderColor = Color(0xFFF7C46A), inkColor = Color(0xFF1E1200), mutedColor = Color(0xFF4A2E00)
+        bg = Color(0xFFDC6601), borderColor = Color(0xFFF7C46A), inkColor = Color.White, mutedColor = Color(0xFFFFE9D6)
     ) {
         if (d == null || d.time.isEmpty()) {
             Text(if (failed) "Daten gerade nicht erreichbar." else "Lade Daten …", fontSize = 13.sp, color = LocalMuted.current)
