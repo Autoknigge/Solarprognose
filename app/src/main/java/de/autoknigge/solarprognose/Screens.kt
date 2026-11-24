@@ -367,7 +367,11 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val selName = Extras.COMPARE_MODELS.firstOrNull { it.first == selModel }?.second ?: "ICON"
                 val fk = if (eveningSwitch || d0.kwh <= 0.0) 1.0 else (cmp(d0, selModel)?.let { it / d0.kwh } ?: 1.0)
                 // Tageswerte für Diagramme und Summen: gewähltes Modell
-                fun adjDay(d: Day): Day = cmp(d, selModel)?.let { d.copy(kwh = it) } ?: d
+                fun adjDay(d: Day): Day {
+                    val sun = modelsMap?.get("$selModel#sun")?.get(d.date)
+                    val d2 = if (sun != null) d.copy(sunH = sun) else d
+                    return cmp(d, selModel)?.let { d2.copy(kwh = it) } ?: d2
+                }
                 val dayListA = dayList.map { adjDay(it) }
                 val total = dayListA.sumOf { it.kwh }
                 val best = dayListA.maxByOrNull { it.kwh } ?: adjDay(t0)
@@ -410,7 +414,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 }
 
                 val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0)?.times(fk) }
-                if (eveningSwitch && d1 != null) TomorrowCard(d1.kwh, d1.sunH, run {
+                if (eveningSwitch && d1 != null) TomorrowCard(adjDay(d1).kwh, adjDay(d1).sunH, run {
                     var cum = 0.0
                     var res: String? = null
                     for (h in forecast.hours.subList(d1.start, minOf(d1.end, forecast.hours.size))) {
@@ -424,7 +428,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                     res
                 })
-                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, satNote = "Modell " + selName + ". " + (spread(d0) ?: "") + " „Bisher“ aus dem Wetter berechnet, nicht gemessen.", nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
+                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, satNote = "Modell " + selName + ". " + (spread(d0) ?: "") + " „Bisher“ aus dem Wetter berechnet, nicht gemessen.", nowKw = nowKw, sunTotal = adjDay(d0).sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } * (if (d0.sunH > 0.0) (adjDay(d0).sunH ?: d0.sunH) / d0.sunH else 1.0) })
 
                 val dayF = (full ?: forecast).let { f0 -> f0.copy(days = f0.days.map { adjDay(it) }) }
                 val hourF = if (range == -2) dayF else forecast
