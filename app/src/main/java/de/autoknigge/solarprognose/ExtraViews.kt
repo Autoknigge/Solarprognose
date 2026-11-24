@@ -158,23 +158,34 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
 }
 
 /** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest, kompakt. */
+class ModelRow(val name: String, val v0: Double?, val v1: Double?, val s0: Double?, val s1: Double?)
+
 @Composable
-fun ModelCard(rows: List<Triple<String, Double?, Double?>>, label0: String, label1: String) {
+fun ModelCard(rows: List<ModelRow>, label0: String, label1: String) {
     SectionCard(title = "Modellvergleich (reine Modellwerte, kWh)") {
+        fun tone(v: Double?, all: List<Double?>): Color {
+            val vs = all.filterNotNull()
+            if (v == null || vs.size < 2 || vs.max() - vs.min() < 0.05) return Ink
+            return if (v == vs.max()) TileToday else if (v == vs.min()) TileTomorrow else Ink
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(" ", fontSize = 12.sp)
                 Text(label0, fontSize = 13.sp, color = Muted)
                 Text(label1, fontSize = 13.sp, color = Muted)
+                Text("Sonne " + label0.substringBefore(" "), fontSize = 12.sp, color = Muted)
+                Text("Sonne " + label1.substringBefore(" "), fontSize = 12.sp, color = Muted)
             }
-            for ((name, v0, v1) in rows) Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(name, fontSize = 12.sp, color = Gold, fontWeight = FontWeight.SemiBold)
-                Text(v0?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = Ink, fontWeight = FontWeight.Bold)
-                Text(v1?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = Ink, fontWeight = FontWeight.Bold)
+            for (r in rows) Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(r.name, fontSize = 12.sp, color = Gold, fontWeight = FontWeight.SemiBold)
+                Text(r.v0?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = tone(r.v0, rows.map { it.v0 }), fontWeight = FontWeight.Bold)
+                Text(r.v1?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = tone(r.v1, rows.map { it.v1 }), fontWeight = FontWeight.Bold)
+                Text(r.s0?.let { Calc.fmt1(it) + " h" } ?: "–", fontSize = 12.sp, color = Muted)
+                Text(r.s1?.let { Calc.fmt1(it) + " h" } ?: "–", fontSize = 12.sp, color = Muted)
             }
         }
         Text(
-            "Gleiche Anlage, die Einstrahlung jedes Modells auf die Prognose umgerechnet (ICON = Grundwert). Große Abstände heißen: die Wetterlage ist unsicher. Die Kacheln oben und die Balken zeigen die korrigierten Werte.",
+            "Gleiche Anlage, die Einstrahlung jedes Modells auf die Prognose der App umgerechnet (ICON entspricht der Prognose der App vor Korrektur). Große Abstände heißen: die Wetterlage ist unsicher.",
             fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
     }

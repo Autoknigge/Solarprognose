@@ -484,7 +484,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     val mt0 = dayList[0]
                     val mt1 = dayList.getOrNull(1)
                     ModelCard(
-                        Extras.COMPARE_MODELS.map { (id, nm) -> Triple(nm, cmp(mt0, id), cmp(mt1, id)) },
+                        Extras.COMPARE_MODELS.map { (id, nm) -> ModelRow(nm, cmp(mt0, id), cmp(mt1, id), mm["$id#sun"]?.get(mt0.date), mt1?.let { mm["$id#sun"]?.get(it.date) }) },
                         Calc.weekday(mt0.date) + " " + Calc.dm(mt0.date), mt1?.let { Calc.weekday(it.date) + " " + Calc.dm(it.date) } ?: ""
                     )
                 }
