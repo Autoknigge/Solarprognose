@@ -363,7 +363,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         sm += h.gti; ss += sv; cnt++
                     }
                     dCnt = cnt; dSm = sm; dSs = ss
-                    if (cnt >= 1 && sm >= 80.0 && ss / sm < (if (cnt >= 2) 0.85 else 0.7)) (ss / sm).coerceIn(0.05, 1.0) else null
+                    if (cnt >= 1 && sm >= 80.0 && (ss / sm < (if (cnt >= 2) 0.85 else 0.7) || ss / sm > (if (cnt >= 2) 1.15 else 1.3))) (ss / sm).coerceIn(0.05, 1.6) else null
                 }
                 // Frühe Schätzung vor genug Satellitendaten: beobachtete Bewölkung (DWD) gegen Modell-Bewölkung
                 val obs = vm.obsCloud[plant.id]
@@ -393,10 +393,10 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     fun q(f: Double) = v[Math.round(f * (v.size - 1)).toInt()]
                     return doubleArrayOf(q(0.1), q(0.5), q(0.9), v.size.toDouble())
                 }
-                fun rangeText(q: DoubleArray) = "Spanne " + Calc.fmt0(q[0]) + " bis " + Calc.fmt0(q[2]) + " kWh (80 % der Läufe)"
+                fun rangeText(q: DoubleArray) = "Spanne " + Calc.fmt0(q[0]) + " bis " + Calc.fmt0(q[2]) + " kWh (80 % der Simulationen)"
                 val ensToday = if (eveningSwitch) null else ensQ(d0.date, d0.kwh)
                 val fk = satFactor ?: obsFactor ?: (ensToday?.let { it[1] / d0.kwh } ?: 1.0)
-                val ensNote = if (satFactor == null && obsFactor == null) ensToday?.let { "Wahrscheinlich " + Calc.fmt0(it[1]) + " kWh (Median von " + Calc.fmt0(it[3]) + " Läufen). " + rangeText(it) + ". Modellprognose: " + Calc.fmt1(d0.kwh) + " kWh." } else null
+                val ensNote = if (satFactor == null && obsFactor == null) ensToday?.let { "Wahrscheinlich " + Calc.fmt0(it[1]) + " kWh (Median von " + Calc.fmt0(it[3]) + " Simulationen). " + rangeText(it) + ". Modellprognose: " + Calc.fmt1(d0.kwh) + " kWh." } else null
                 val ensT0 = if (eveningSwitch) ensQ(t0.date, t0.kwh) else null
                 val ensT1 = t1?.let { ensQ(it.date, it.kwh) }
                 val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" + (it.station?.let { st -> " (" + st + ")" } ?: "") } ?: "keine Daten") +
@@ -455,7 +455,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                     res
                 })
-                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, diag = diagText, satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher nur " + Calc.fmt0(it * 100) + " % des Modells). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: obsFactor?.let { "Frühe Schätzung nach beobachteter Bewölkung (DWD" + (obs?.station?.let { st -> ", " + st } ?: "") + ": " + Calc.fmt0(obs?.pct ?: 0.0) + " %, Modell: " + Calc.fmt0(modelCloud ?: 0.0) + " %). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: ensNote, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
+                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, diag = diagText, satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher " + Calc.fmt0(it * 100) + " % des Modells). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: obsFactor?.let { "Frühe Schätzung nach beobachteter Bewölkung (DWD" + (obs?.station?.let { st -> ", " + st } ?: "") + ": " + Calc.fmt0(obs?.pct ?: 0.0) + " %, Modell: " + Calc.fmt0(modelCloud ?: 0.0) + " %). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: ensNote, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
 
                 val dayF = full ?: forecast
                 val hourF = if (range == -2) dayF else forecast
