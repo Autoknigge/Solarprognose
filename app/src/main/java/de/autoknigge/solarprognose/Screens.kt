@@ -348,8 +348,6 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val dayList = if (eveningSwitch) forecast.days.drop(1) else forecast.days
                 val t0 = dayList[0]
                 val t1 = dayList.getOrNull(1)
-                val total = dayList.sumOf { it.kwh }
-                val best = dayList.maxByOrNull { it.kwh } ?: t0
                 val restModel = nowC?.let { Calc.remainingToday(forecast, it) }
                 // Satelliten-Korrektur: nur wenn die gemessene Einstrahlung heute deutlich (> 25 %) unter dem Modell liegt
                 val satMap = vm.sat[plant.id]
@@ -399,6 +397,13 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val ensNote = if (satFactor == null && obsFactor == null) ensToday?.let { "Wahrscheinlich " + Calc.fmt0(it[1]) + " kWh (Median von " + Calc.fmt0(it[3]) + " Simulationen). " + rangeText(it) + ". Modellprognose: " + Calc.fmt1(d0.kwh) + " kWh." } else null
                 val ensT0 = if (eveningSwitch) ensQ(t0.date, t0.kwh) else null
                 val ensT1 = t1?.let { ensQ(it.date, it.kwh) }
+                // Tageswerte für Diagramme und Summen: heute korrigiert, kommende Tage mit Ensemble-Median
+                fun adjDay(d: Day): Day =
+                    if (d.date == d0.date) { if (eveningSwitch) d else d.copy(kwh = d.kwh * fk) }
+                    else ensQ(d.date, d.kwh)?.let { d.copy(kwh = it[1]) } ?: d
+                val dayListA = dayList.map { adjDay(it) }
+                val total = dayListA.sumOf { it.kwh }
+                val best = dayListA.maxByOrNull { it.kwh } ?: adjDay(t0)
                 val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" + (it.station?.let { st -> " (" + st + ")" } ?: "") } ?: "keine Daten") +
                     " · Satellit: " + (if (satMap == null) "keine Daten" else if (dCnt == 0) "noch keine vergleichbare Stunde" else dCnt.toString() + " Std., Messung " + Calc.fmt0(dSs / dCnt) + " gegen Modell " + Calc.fmt0(dSm / dCnt) + " W/m²") +
                     " · Faktor " + Calc.fmt2(fk)
@@ -457,7 +462,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 })
                 else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, diag = diagText, satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher " + Calc.fmt0(it * 100) + " % des Modells). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: obsFactor?.let { "Frühe Schätzung nach beobachteter Bewölkung (DWD" + (obs?.station?.let { st -> ", " + st } ?: "") + ": " + Calc.fmt0(obs?.pct ?: 0.0) + " %, Modell: " + Calc.fmt0(modelCloud ?: 0.0) + " %). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: ensNote, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
 
-                val dayF = full ?: forecast
+                val dayF = (full ?: forecast).let { f0 -> f0.copy(days = f0.days.map { adjDay(it) }) }
                 val hourF = if (range == -2) dayF else forecast
                 val hourNow = if (range == -2 && full != null) nowFull else nowC
                 val nowIdx = hourNow?.let { (Math.floor(it).toInt() + 1).coerceIn(0, (hourF.hours.size - 1).coerceAtLeast(0)) }
@@ -506,7 +511,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Text("Tippe oder wische ins Diagramm für Details.", fontSize = 11.5.sp, color = WarmMuted)
                 }
 
-                val pf = full ?: forecast
+                val pf = dayF
                 val shown = (0 until pf.days.size).toList()
                 if (shown.isNotEmpty()) {
                     val maxP = pf.hours.maxOfOrNull { it.power } ?: 0.0
