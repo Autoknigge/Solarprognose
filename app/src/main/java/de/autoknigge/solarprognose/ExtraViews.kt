@@ -522,7 +522,7 @@ fun GridNowCard(m: MixSeries) {
     val z = Instant.ofEpochSecond(m.shareT).atZone(zone)
     SectionCard(
         title = "Strombedarf jetzt: Anteil Solar und Erneuerbare",
-        bg = Color(0xFFE27602), borderColor = Color(0xFFFFB27A), inkColor = Color.Black, mutedColor = Color.Black, darken = 0f
+        bg = Color(0xFFE27602), borderColor = Color(0xFFFFB27A), inkColor = Color.Black, mutedColor = Color.Black
     ) {
         Text(
             "Deutschland, Stand " + String.format(Locale.GERMANY, "%02d:%02d Uhr", z.hour, z.minute) + (if (m.estFrom in 0 until m.t.size && m.shareT >= m.t[m.estFrom]) " (vorläufig)" else ""),
@@ -728,7 +728,7 @@ private fun profileCloudAt(d: ProfileData, i: Int, hm: Double): Double {
 fun ProfileCard(d: ProfileData?, failed: Boolean, lat: Double, lon: Double, temps: Map<String, Double> = emptyMap()) {
     SectionCard(
         title = "Niederschlag und Wolken",
-        bg = Color(0xFFDC6601), borderColor = Color(0xFFF7C46A), inkColor = Color(0xFF1E1200), mutedColor = Color(0xFF4A2E00), darken = 0f
+        bg = Color(0xFFDC6601), borderColor = Color(0xFFF7C46A), inkColor = Color(0xFF1E1200), mutedColor = Color(0xFF4A2E00)
     ) {
         if (d == null || d.time.isEmpty()) {
             Text(if (failed) "Daten gerade nicht erreichbar." else "Lade Daten …", fontSize = 13.sp, color = LocalMuted.current)

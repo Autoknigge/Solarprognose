@@ -486,8 +486,6 @@ object Extras {
             rShare = rs
             if (ss != null) sShare = ss
             sT = t2[lastI]
-            val ren = (v2["Solar"]?.get(lastI) ?: 0.0) + (v2["Wind"]?.get(lastI) ?: 0.0) + (v2["Biomasse"]?.get(lastI) ?: 0.0) + (v2["Wasserkraft"]?.get(lastI) ?: 0.0)
-            if (rs > 5.0 && ren > 1000.0) v2["Last"]?.let { it[lastI] = ren / (rs / 100.0) }
         }
         return MixSeries(t2, v2, s.hasTrade, sShare, rShare, sT, n)
     }
