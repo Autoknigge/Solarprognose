@@ -107,19 +107,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 } catch (e: Exception) {
                 }
                 try {
-                    sat = sat + (p.id to Extras.loadSatGti(p))
-                } catch (e: Exception) {
-                }
-                try {
                     models = models + (p.id to Extras.loadModels(p))
-                } catch (e: Exception) {
-                }
-                try {
-                    ens = ens + (p.id to Extras.loadEns(p))
-                } catch (e: Exception) {
-                }
-                try {
-                    Extras.loadObsCloud(p)?.let { obsCloud = obsCloud + (p.id to it) }
                 } catch (e: Exception) {
                 }
             }

@@ -558,7 +558,7 @@ object Extras {
     suspend fun loadModels(p: Plant): Map<String, Map<String, Double>> = withContext(Dispatchers.IO) {
         val ids = COMPARE_MODELS.joinToString(",") { it.first }
         val h = JSONObject(
-            Api.get("https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&hourly=shortwave_radiation,sunshine_duration&models=$ids&forecast_days=3&timezone=auto", false)
+            Api.get("https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&hourly=shortwave_radiation,sunshine_duration&models=$ids&forecast_days=7&timezone=auto", false)
         ).getJSONObject("hourly")
         val t = h.getJSONArray("time")
         val out = HashMap<String, Map<String, Double>>()

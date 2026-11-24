@@ -243,6 +243,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
         }
     }
     // Tageswechsel um 0 Uhr: Prognose sofort neu zuschneiden und frisch laden
+    val ctxUi = LocalContext.current
+    var selModel by remember { mutableStateOf(ctxUi.getSharedPreferences("sp_ui", 0).getString("model", "icon_seamless") ?: "icon_seamless") }
     val dayKey = remember(tick) { java.time.LocalDate.now().toString() }
     var lastDay by remember { mutableStateOf(dayKey) }
     LaunchedEffect(dayKey) {
@@ -349,64 +351,26 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val t0 = dayList[0]
                 val t1 = dayList.getOrNull(1)
                 val restModel = nowC?.let { Calc.remainingToday(forecast, it) }
-                // Satelliten-Korrektur: nur wenn die gemessene Einstrahlung heute deutlich (> 25 %) unter dem Modell liegt
-                val satMap = vm.sat[plant.id]
-                var dCnt = 0; var dSm = 0.0; var dSs = 0.0
-                val satFactor: Double? = if (satMap == null || nowC == null || eveningSwitch) null else {
-                    var sm = 0.0; var ss = 0.0; var cnt = 0
-                    for (i in 0..Math.floor(nowC).toInt().coerceAtMost(forecast.hours.size - 1)) {
-                        val h = forecast.hours[i]
-                        if (h.date != d0.date || h.gti < 40.0) continue
-                        val sv = satMap[h.time] ?: continue
-                        sm += h.gti; ss += sv; cnt++
-                    }
-                    dCnt = cnt; dSm = sm; dSs = ss
-                    if (cnt >= 1 && sm >= 80.0 && (ss / sm < (if (cnt >= 2) 0.85 else 0.7) || ss / sm > (if (cnt >= 2) 1.15 else 1.3))) (ss / sm).coerceIn(0.05, 1.6) else null
+                // Modellauswahl: gewähltes Modell (Rahmen im Modellvergleich) bestimmt die Werte, umgerechnet relativ zu ICON
+                val modelsMap = vm.models[plant.id]
+                val modelRef = modelsMap?.get("icon_seamless")
+                fun cmp(d: Day?, id: String): Double? {
+                    if (d == null || modelRef == null) return null
+                    val e = modelsMap[id]?.get(d.date) ?: return null
+                    val r = modelRef[d.date] ?: return null
+                    return if (r < 50.0) null else d.kwh * e / r
                 }
-                // Frühe Schätzung vor genug Satellitendaten: beobachtete Bewölkung (DWD) gegen Modell-Bewölkung
-                val obs = vm.obsCloud[plant.id]
-                var modelCloud: Double? = null
-                val obsFactor: Double? = if (satFactor != null || obs == null || nowC == null || eveningSwitch) null else {
-                    var wc = 0.0; var ww = 0.0
-                    for (i in (Math.floor(nowC).toInt() + 1) until minOf(d0.end, forecast.hours.size)) {
-                        val h = forecast.hours[i]
-                        if (h.gti > 50.0) { wc += h.cloud * h.gti; ww += h.gti }
-                    }
-                    if (ww <= 0.0) null else {
-                        val mc = wc / ww
-                        modelCloud = mc
-                        fun tr(c: Double) = 1.0 - 0.75 * Math.pow((c / 100.0).coerceIn(0.0, 1.0), 3.4)
-                        val f = tr(obs.pct) / tr(mc)
-                        if (obs.pct >= 85.0 && f < 0.75) f.coerceIn(0.15, 1.0) else null
-                    }
+                fun spread(d: Day?): String? {
+                    val v = Extras.COMPARE_MODELS.mapNotNull { (id, _) -> cmp(d, id) }
+                    return if (v.size < 2) null else "Modelle: " + Calc.fmt0(v.min()) + " bis " + Calc.fmt0(v.max()) + " kWh"
                 }
-                // Ensemble: 10/50/90-%-Quantile des Tagesertrags aus den Läufen, skaliert auf die App-Prognose des Tages
-                val ensRaw = vm.ens[plant.id]
-                fun ensQ(date: String, kwh: Double): DoubleArray? {
-                    val r = ensRaw ?: return null
-                    val ed = r.det[date] ?: return null
-                    if (ed < 50.0 || kwh <= 0.0) return null
-                    val v = r.members.mapNotNull { it[date] }.map { kwh * it / ed }.sorted()
-                    if (v.size < 8) return null
-                    fun q(f: Double) = v[Math.round(f * (v.size - 1)).toInt()]
-                    return doubleArrayOf(q(0.1), q(0.5), q(0.9), v.size.toDouble())
-                }
-                fun rangeText(q: DoubleArray) = "Spanne " + Calc.fmt0(q[0]) + " bis " + Calc.fmt0(q[2]) + " kWh (80 % der Simulationen)"
-                val ensToday = if (eveningSwitch) null else ensQ(d0.date, d0.kwh)
-                val fk = satFactor ?: obsFactor ?: (ensToday?.let { it[1] / d0.kwh } ?: 1.0)
-                val ensNote = if (satFactor == null && obsFactor == null) ensToday?.let { "Wahrscheinlich " + Calc.fmt0(it[1]) + " kWh (Median von " + Calc.fmt0(it[3]) + " Simulationen). " + rangeText(it) + ". Modellprognose: " + Calc.fmt1(d0.kwh) + " kWh." } else null
-                val ensT0 = if (eveningSwitch) ensQ(t0.date, t0.kwh) else null
-                val ensT1 = t1?.let { ensQ(it.date, it.kwh) }
-                // Tageswerte für Diagramme und Summen: heute korrigiert, kommende Tage mit Ensemble-Median
-                fun adjDay(d: Day): Day =
-                    if (d.date == d0.date) { if (eveningSwitch) d else d.copy(kwh = d.kwh * fk) }
-                    else ensQ(d.date, d.kwh)?.let { d.copy(kwh = it[1]) } ?: d
+                val selName = Extras.COMPARE_MODELS.firstOrNull { it.first == selModel }?.second ?: "ICON"
+                val fk = if (eveningSwitch || d0.kwh <= 0.0) 1.0 else (cmp(d0, selModel)?.let { it / d0.kwh } ?: 1.0)
+                // Tageswerte für Diagramme und Summen: gewähltes Modell
+                fun adjDay(d: Day): Day = cmp(d, selModel)?.let { d.copy(kwh = it) } ?: d
                 val dayListA = dayList.map { adjDay(it) }
                 val total = dayListA.sumOf { it.kwh }
                 val best = dayListA.maxByOrNull { it.kwh } ?: adjDay(t0)
-                val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" + (it.station?.let { st -> " (" + st + ")" } ?: "") } ?: "keine Daten") +
-                    " · Satellit: " + (if (satMap == null) "keine Daten" else if (dCnt == 0) "noch keine vergleichbare Stunde" else dCnt.toString() + " Std., Messung " + Calc.fmt0(dSs / dCnt) + " gegen Modell " + Calc.fmt0(dSm / dCnt) + " W/m²") +
-                    " · Faktor " + Calc.fmt2(fk)
                 val rest = restModel?.let { it * fk }
 
                 val uvNow = nowC?.let { c ->
@@ -435,9 +399,9 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Tile(if (eveningSwitch) "Morgen" else "Heute", Calc.fmt1(if (eveningSwitch) (ensT0?.get(1) ?: t0.kwh) else t0.kwh * fk), "kWh", if (eveningSwitch) (ensT0?.let { rangeText(it) + "\n" } ?: "") + "Spitze " + Calc.fmt0(t0.peak) + " W gegen " + t0.peakHour + " Uhr" else if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
+                    Tile(if (eveningSwitch) "Morgen" else "Heute", Calc.fmt1(if (eveningSwitch) adjDay(t0).kwh else t0.kwh * fk), "kWh", if (eveningSwitch) (spread(t0)?.let { it + "\n" } ?: "") + "Spitze " + Calc.fmt0(t0.peak) + " W gegen " + t0.peakHour + " Uhr" else if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
                         Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(t0), bg = TileToday, mutedColor = Color(0xFFFFE6DA))
-                    Tile(if (eveningSwitch) "Übermorgen" else "Morgen", t1?.let { Calc.fmt1(ensT1?.get(1) ?: it.kwh) } ?: "–", "kWh", t1?.let { (ensT1?.let { q -> rangeText(q) + "\n" } ?: "") + "Spitze " + Calc.fmt0(it.peak) + " W gegen " + it.peakHour + " Uhr" } ?: "",
+                    Tile(if (eveningSwitch) "Übermorgen" else "Morgen", t1?.let { Calc.fmt1(adjDay(it).kwh) } ?: "–", "kWh", t1?.let { (spread(t1)?.let { q -> q + "\n" } ?: "") + "Spitze " + Calc.fmt0(it.peak) + " W gegen " + it.peakHour + " Uhr" } ?: "",
                         Modifier.weight(1f).fillMaxHeight(), icon = t1?.let { Extras.kindOf(it) }, bg = TileTomorrow, mutedColor = Color(0xFFFFEBD6))
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -460,7 +424,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                     res
                 })
-                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, diag = diagText, satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher " + Calc.fmt0(it * 100) + " % des Modells). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: obsFactor?.let { "Frühe Schätzung nach beobachteter Bewölkung (DWD" + (obs?.station?.let { st -> ", " + st } ?: "") + ": " + Calc.fmt0(obs?.pct ?: 0.0) + " %, Modell: " + Calc.fmt0(modelCloud ?: 0.0) + " %). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: ensNote, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
+                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, satNote = "Modell " + selName + ". " + (spread(d0) ?: "") + " „Bisher“ aus dem Wetter berechnet, nicht gemessen.", nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
 
                 val dayF = (full ?: forecast).let { f0 -> f0.copy(days = f0.days.map { adjDay(it) }) }
                 val hourF = if (range == -2) dayF else forecast
@@ -473,20 +437,14 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     else -> 72
                 }
 
-                vm.models[plant.id]?.let { mm ->
-                    val ref = mm["icon_seamless"]
-                    fun cmp(d: Day?, id: String): Double? {
-                        if (d == null || ref == null) return null
-                        val e = mm[id]?.get(d.date) ?: return null
-                        val r = ref[d.date] ?: return null
-                        return if (r < 50.0) null else d.kwh * e / r
-                    }
+                modelsMap?.let { mm ->
                     val mt0 = dayList[0]
                     val mt1 = dayList.getOrNull(1)
                     ModelCard(
-                        Extras.COMPARE_MODELS.map { (id, nm) -> ModelRow(nm, cmp(mt0, id), cmp(mt1, id), mm["$id#sun"]?.get(mt0.date), mt1?.let { mm["$id#sun"]?.get(it.date) }) },
-                        Calc.weekday(mt0.date) + " " + Calc.dm(mt0.date), mt1?.let { Calc.weekday(it.date) + " " + Calc.dm(it.date) } ?: ""
-                    )
+                        Extras.COMPARE_MODELS.map { (id, nm) -> ModelRow(id, nm, cmp(mt0, id), cmp(mt1, id), mm["$id#sun"]?.get(mt0.date), mt1?.let { mm["$id#sun"]?.get(it.date) }) },
+                        Calc.weekday(mt0.date) + " " + Calc.dm(mt0.date), mt1?.let { Calc.weekday(it.date) + " " + Calc.dm(it.date) } ?: "",
+                        selModel
+                    ) { id -> selModel = id; ctx.getSharedPreferences("sp_ui", 0).edit().putString("model", id).apply() }
                 }
                 SectionCard(title = "Ertrag pro Tag (kWh)") {
                     val sd = selDay

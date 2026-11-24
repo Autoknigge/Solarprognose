@@ -158,10 +158,10 @@ private fun Stat(label: String, value: String, unit: String, color: Color = Ink)
 }
 
 /** Tagesprognose, bisher erzeugte Menge (aus dem Wetter berechnet) und erwarteter Rest, kompakt. */
-class ModelRow(val name: String, val v0: Double?, val v1: Double?, val s0: Double?, val s1: Double?)
+class ModelRow(val id: String, val name: String, val v0: Double?, val v1: Double?, val s0: Double?, val s1: Double?)
 
 @Composable
-fun ModelCard(rows: List<ModelRow>, label0: String, label1: String) {
+fun ModelCard(rows: List<ModelRow>, label0: String, label1: String, selected: String, onSelect: (String) -> Unit) {
     SectionCard(title = "Modellvergleich (reine Modellwerte, kWh)") {
         fun tone(v: Double?, all: List<Double?>): Color {
             val vs = all.filterNotNull()
@@ -177,7 +177,7 @@ fun ModelCard(rows: List<ModelRow>, label0: String, label1: String) {
                 Text("🌞 Std.", fontSize = 12.sp, color = Muted)
             }
             for (r in rows) {
-                val frame = if (r.name == "ICON") Modifier.border(1.5.dp, Gold, RoundedCornerShape(12.dp)) else Modifier
+                val frame = (if (r.id == selected) Modifier.border(1.5.dp, Gold, RoundedCornerShape(12.dp)) else Modifier).clip(RoundedCornerShape(12.dp)).clickable { onSelect(r.id) }
                 Column(frame.padding(horizontal = 6.dp, vertical = 6.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(r.name, fontSize = 12.sp, color = Gold, fontWeight = FontWeight.SemiBold)
                     Text(r.v0?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = tone(r.v0, rows.map { it.v0 }), fontWeight = FontWeight.Bold)
@@ -188,7 +188,7 @@ fun ModelCard(rows: List<ModelRow>, label0: String, label1: String) {
             }
         }
         Text(
-            "Gleiche Anlage, die Einstrahlung jedes Modells auf die Prognose der App umgerechnet (ICON entspricht der Prognose der App vor Korrektur). Große Abstände heißen: die Wetterlage ist unsicher.",
+            "Gleiche Anlage, die Einstrahlung jedes Modells auf die Prognose der App umgerechnet (ICON = Grundlage der Umrechnung). Antippen wählt das Modell für Kacheln, Balken und Summen. Große Abstände heißen: die Wetterlage ist unsicher.",
             fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
     }
