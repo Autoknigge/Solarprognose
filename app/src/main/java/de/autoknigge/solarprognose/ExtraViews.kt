@@ -162,7 +162,23 @@ class ModelRow(val id: String, val name: String, val v0: Double?, val v1: Double
 
 @Composable
 fun ModelCard(rows: List<ModelRow>, label0: String, label1: String, selected: String, onSelect: (String) -> Unit) {
-    SectionCard(title = "Modellvergleich (reine Modellwerte, kWh)") {
+    var info by remember { mutableStateOf(false) }
+    if (info) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { info = false },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { info = false }) { Text("Schließen") } },
+        title = { Text("Die Wettermodelle") },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Vier große numerische Wettermodelle, auf deren Strahlungs- und Wetterdaten die Ertragsprognose beruht.", fontSize = 13.sp)
+                Text("ICON – Globales Modell des Deutschen Wetterdienstes (mit hochauflösenden Ablegern ICON-EU und ICON-D2). Wird mehrmals täglich gerechnet; in der App Grundlage der Umrechnung auf deine Anlage.", fontSize = 13.sp)
+                Text("ECMWF – Europäisches Zentrum für mittelfristige Wettervorhersage (Reading). Gilt oft als Referenz, besonders für 3 bis 10 Tage.", fontSize = 13.sp)
+                Text("GFS – Globales Modell der US-Wetterbehörde NOAA. Läuft viermal täglich, dient oft als Zweitmeinung.", fontSize = 13.sp)
+                Text("Arpège – Modell des französischen Wetterdienstes Météo-France, höher aufgelöst über Europa, vor allem für die nächsten Tage (bis etwa 4).", fontSize = 13.sp)
+                Text("Welches ist das beste? Keines gewinnt in jeder Lage. In Mitteleuropa sind ECMWF und ICON meist die verlässliche Basis, Arpège und GFS die Gegenprobe. Springen die Werte stark auseinander, ist die Wetterlage unsicher (Nebel, Wolkenlücken). Am genauesten wird es, wenn man die Prognose mit den echten Erträgen der eigenen Anlage vergleicht.", fontSize = 13.sp)
+            }
+        }
+    )
+    SectionCard(title = "Modellvergleich* (reine Modellwerte, kWh)") {
         fun tone(v: Double?, all: List<Double?>): Color {
             val vs = all.filterNotNull()
             if (v == null || vs.size < 2 || vs.max() - vs.min() < 0.05) return Ink
@@ -191,6 +207,7 @@ fun ModelCard(rows: List<ModelRow>, label0: String, label1: String, selected: St
             "Gleiche Anlage, die Einstrahlung jedes Modells auf die Prognose der App umgerechnet (ICON = Grundlage der Umrechnung). Antippen wählt das Modell für Kacheln, Balken und Summen. Große Abstände heißen: die Wetterlage ist unsicher.",
             fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
+        Text("* Was bedeuten ICON, ECMWF, GFS, Arpège?", fontSize = 12.sp, color = Gold, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline, modifier = Modifier.padding(top = 6.dp).clickable { info = true })
     }
 }
 
