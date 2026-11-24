@@ -522,7 +522,7 @@ fun GridNowCard(m: MixSeries) {
     val z = Instant.ofEpochSecond(m.shareT).atZone(zone)
     SectionCard(
         title = "Strombedarf jetzt: Anteil Solar und Erneuerbare",
-        bg = Color(0xFFE27602), borderColor = Color(0xFFFFB27A), inkColor = Color.White, mutedColor = Color(0xFFFFE0CC), darken = 0f
+        bg = Color(0xFFE27602), borderColor = Color(0xFFFFB27A), inkColor = Color.Black, mutedColor = Color.Black, darken = 0f
     ) {
         Text(
             "Deutschland, Stand " + String.format(Locale.GERMANY, "%02d:%02d Uhr", z.hour, z.minute) + (if (m.estFrom in 0 until m.t.size && m.shareT >= m.t[m.estFrom]) " (vorläufig)" else ""),
