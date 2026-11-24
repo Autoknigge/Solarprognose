@@ -526,6 +526,32 @@ object Extras {
         d
     }
 
+    /** Tagessummen der Einstrahlung (Wh/m²) je Datum: Referenzlauf und Ensemble-Mitglieder desselben Modells. */
+    class EnsRaw(val det: Map<String, Double>, val members: List<Map<String, Double>>)
+
+    suspend fun loadEns(p: Plant): EnsRaw = withContext(Dispatchers.IO) {
+        fun sums(t: org.json.JSONArray, a: org.json.JSONArray): Map<String, Double> {
+            val m = HashMap<String, Double>()
+            for (i in 0 until minOf(t.length(), a.length())) if (!a.isNull(i)) {
+                val d = t.getString(i).substring(0, 10)
+                m[d] = (m[d] ?: 0.0) + a.getDouble(i)
+            }
+            return m
+        }
+        val base = "latitude=${p.lat}&longitude=${p.lon}&hourly=shortwave_radiation&models=icon_seamless&forecast_days=7&timezone=auto"
+        val dh = JSONObject(Api.get("https://api.open-meteo.com/v1/forecast?$base", false)).getJSONObject("hourly")
+        val det = sums(dh.getJSONArray("time"), dh.getJSONArray("shortwave_radiation"))
+        val eh = JSONObject(Api.get("https://ensemble-api.open-meteo.com/v1/ensemble?$base", false)).getJSONObject("hourly")
+        val et = eh.getJSONArray("time")
+        val members = ArrayList<Map<String, Double>>()
+        val it = eh.keys()
+        while (it.hasNext()) {
+            val k = it.next()
+            if (k.startsWith("shortwave_radiation")) members.add(sums(et, eh.getJSONArray(k)))
+        }
+        EnsRaw(det, members)
+    }
+
     class ObsCloud(val pct: Double, val station: String?)
 
     /** Beobachtete Bewölkung (DWD über Bright Sky), auch nachts verfügbar. */

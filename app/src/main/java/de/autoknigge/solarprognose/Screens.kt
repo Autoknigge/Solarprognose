@@ -382,7 +382,23 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         if (obs.pct >= 85.0 && f < 0.75) f.coerceIn(0.15, 1.0) else null
                     }
                 }
-                val fk = satFactor ?: obsFactor ?: 1.0
+                // Ensemble: 10/50/90-%-Quantile des Tagesertrags aus den Läufen, skaliert auf die App-Prognose des Tages
+                val ensRaw = vm.ens[plant.id]
+                fun ensQ(date: String, kwh: Double): DoubleArray? {
+                    val r = ensRaw ?: return null
+                    val ed = r.det[date] ?: return null
+                    if (ed < 50.0 || kwh <= 0.0) return null
+                    val v = r.members.mapNotNull { it[date] }.map { kwh * it / ed }.sorted()
+                    if (v.size < 8) return null
+                    fun q(f: Double) = v[Math.round(f * (v.size - 1)).toInt()]
+                    return doubleArrayOf(q(0.1), q(0.5), q(0.9), v.size.toDouble())
+                }
+                fun rangeText(q: DoubleArray) = "Spanne " + Calc.fmt0(q[0]) + " bis " + Calc.fmt0(q[2]) + " kWh (80 % der Läufe)"
+                val ensToday = if (eveningSwitch) null else ensQ(d0.date, d0.kwh)
+                val fk = satFactor ?: obsFactor ?: (ensToday?.let { it[1] / d0.kwh } ?: 1.0)
+                val ensNote = if (satFactor == null && obsFactor == null) ensToday?.let { "Wahrscheinlich " + Calc.fmt0(it[1]) + " kWh (Median von " + Calc.fmt0(it[3]) + " Läufen). " + rangeText(it) + ". Modellprognose: " + Calc.fmt1(d0.kwh) + " kWh." } else null
+                val ensT0 = if (eveningSwitch) ensQ(t0.date, t0.kwh) else null
+                val ensT1 = t1?.let { ensQ(it.date, it.kwh) }
                 val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" + (it.station?.let { st -> " (" + st + ")" } ?: "") } ?: "keine Daten") +
                     " · Satellit: " + (if (satMap == null) "keine Daten" else if (dCnt == 0) "noch keine vergleichbare Stunde" else dCnt.toString() + " Std., Messung " + Calc.fmt0(dSs / dCnt) + " gegen Modell " + Calc.fmt0(dSm / dCnt) + " W/m²") +
                     " · Faktor " + Calc.fmt2(fk)
@@ -414,9 +430,9 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Tile(if (eveningSwitch) "Morgen" else "Heute", Calc.fmt1(if (eveningSwitch) t0.kwh else t0.kwh * fk), "kWh", if (eveningSwitch) "Spitze " + Calc.fmt0(t0.peak) + " W gegen " + t0.peakHour + " Uhr" else if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
+                    Tile(if (eveningSwitch) "Morgen" else "Heute", Calc.fmt1(if (eveningSwitch) (ensT0?.get(1) ?: t0.kwh) else t0.kwh * fk), "kWh", if (eveningSwitch) (ensT0?.let { rangeText(it) + "\n" } ?: "") + "Spitze " + Calc.fmt0(t0.peak) + " W gegen " + t0.peakHour + " Uhr" else if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
                         Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(t0), bg = TileToday, mutedColor = Color(0xFFFFE6DA))
-                    Tile(if (eveningSwitch) "Übermorgen" else "Morgen", t1?.let { Calc.fmt1(it.kwh) } ?: "–", "kWh", t1?.let { "Spitze " + Calc.fmt0(it.peak) + " W gegen " + it.peakHour + " Uhr" } ?: "",
+                    Tile(if (eveningSwitch) "Übermorgen" else "Morgen", t1?.let { Calc.fmt1(ensT1?.get(1) ?: it.kwh) } ?: "–", "kWh", t1?.let { (ensT1?.let { q -> rangeText(q) + "\n" } ?: "") + "Spitze " + Calc.fmt0(it.peak) + " W gegen " + it.peakHour + " Uhr" } ?: "",
                         Modifier.weight(1f).fillMaxHeight(), icon = t1?.let { Extras.kindOf(it) }, bg = TileTomorrow, mutedColor = Color(0xFFFFEBD6))
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -439,7 +455,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                     res
                 })
-                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, diag = diagText, satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher nur " + Calc.fmt0(it * 100) + " % des Modells). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: obsFactor?.let { "Frühe Schätzung nach beobachteter Bewölkung (DWD" + (obs?.station?.let { st -> ", " + st } ?: "") + ": " + Calc.fmt0(obs?.pct ?: 0.0) + " %, Modell: " + Calc.fmt0(modelCloud ?: 0.0) + " %). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." }, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
+                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, diag = diagText, satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher nur " + Calc.fmt0(it * 100) + " % des Modells). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: obsFactor?.let { "Frühe Schätzung nach beobachteter Bewölkung (DWD" + (obs?.station?.let { st -> ", " + st } ?: "") + ": " + Calc.fmt0(obs?.pct ?: 0.0) + " %, Modell: " + Calc.fmt0(modelCloud ?: 0.0) + " %). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: ensNote, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
 
                 val dayF = full ?: forecast
                 val hourF = if (range == -2) dayF else forecast
