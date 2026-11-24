@@ -357,13 +357,30 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     var sm = 0.0; var ss = 0.0; var cnt = 0
                     for (i in 0..Math.floor(nowC).toInt().coerceAtMost(forecast.hours.size - 1)) {
                         val h = forecast.hours[i]
-                        if (h.date != d0.date || h.gti < 150.0) continue
+                        if (h.date != d0.date || h.gti < 40.0) continue
                         val sv = satMap[h.time] ?: continue
                         sm += h.gti; ss += sv; cnt++
                     }
-                    if (cnt >= 2 && sm > 0.0 && ss / sm < 0.75) (ss / sm).coerceIn(0.05, 1.0) else null
+                    if (cnt >= 1 && sm >= 80.0 && ss / sm < (if (cnt >= 2) 0.75 else 0.6)) (ss / sm).coerceIn(0.05, 1.0) else null
                 }
-                val fk = satFactor ?: 1.0
+                // Frühe Schätzung vor genug Satellitendaten: beobachtete Bewölkung (DWD) gegen Modell-Bewölkung
+                val obs = vm.obsCloud[plant.id]
+                var modelCloud: Double? = null
+                val obsFactor: Double? = if (satFactor != null || obs == null || nowC == null || eveningSwitch) null else {
+                    var wc = 0.0; var ww = 0.0
+                    for (i in (Math.floor(nowC).toInt() + 1) until minOf(d0.end, forecast.hours.size)) {
+                        val h = forecast.hours[i]
+                        if (h.gti > 50.0) { wc += h.cloud * h.gti; ww += h.gti }
+                    }
+                    if (ww <= 0.0) null else {
+                        val mc = wc / ww
+                        modelCloud = mc
+                        fun tr(c: Double) = 1.0 - 0.75 * Math.pow((c / 100.0).coerceIn(0.0, 1.0), 3.4)
+                        val f = tr(obs.pct) / tr(mc)
+                        if (obs.pct >= 85.0 && f < 0.75) f.coerceIn(0.15, 1.0) else null
+                    }
+                }
+                val fk = satFactor ?: obsFactor ?: 1.0
                 val rest = restModel?.let { it * fk }
 
                 val uvNow = nowC?.let { c ->
@@ -417,7 +434,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                     res
                 })
-                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher nur " + Calc.fmt0(it * 100) + " % des Modells). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." }, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
+                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher nur " + Calc.fmt0(it * 100) + " % des Modells). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." } ?: obsFactor?.let { "Frühe Schätzung nach beobachteter Bewölkung (DWD" + (obs?.station?.let { st -> ", " + st } ?: "") + ": " + Calc.fmt0(obs?.pct ?: 0.0) + " %, Modell: " + Calc.fmt0(modelCloud ?: 0.0) + " %). Prognose war " + Calc.fmt1(d0.kwh) + " kWh." }, nowKw = nowKw, sunTotal = d0.sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } })
 
                 val dayF = full ?: forecast
                 val hourF = if (range == -2) dayF else forecast

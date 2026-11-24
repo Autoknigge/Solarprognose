@@ -526,6 +526,17 @@ object Extras {
         d
     }
 
+    class ObsCloud(val pct: Double, val station: String?)
+
+    /** Beobachtete Bewölkung (DWD über Bright Sky), auch nachts verfügbar. */
+    suspend fun loadObsCloud(p: Plant): ObsCloud? = withContext(Dispatchers.IO) {
+        val o = JSONObject(Api.get("https://api.brightsky.dev/current_weather?lat=${p.lat}&lon=${p.lon}", false))
+        val w = o.optJSONObject("weather") ?: return@withContext null
+        if (w.isNull("cloud_cover")) return@withContext null
+        val src = o.optJSONArray("sources")?.optJSONObject(0)?.optString("station_name")?.takeIf { it.isNotBlank() }
+        ObsCloud(w.getDouble("cloud_cover"), src)
+    }
+
     /** Gemessene Einstrahlung (Satellit, auf die Modulfläche gerechnet) für heute: Zeit "yyyy-MM-ddTHH:mm" -> W/m². */
     suspend fun loadSatGti(p: Plant): Map<String, Double> = withContext(Dispatchers.IO) {
         val today = LocalDate.now()

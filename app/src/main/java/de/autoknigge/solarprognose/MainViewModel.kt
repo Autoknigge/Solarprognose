@@ -44,6 +44,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var prices by mutableStateOf<List<PriceHour>?>(null)
     var ytd by mutableStateOf<Map<String, YtdData>>(emptyMap())
     var sat by mutableStateOf<Map<String, Map<String, Double>>>(emptyMap())
+    var obsCloud by mutableStateOf<Map<String, Extras.ObsCloud>>(emptyMap())
         private set
     var profile by mutableStateOf<Map<String, ProfileData>>(emptyMap())
         private set
@@ -105,6 +106,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 try {
                     sat = sat + (p.id to Extras.loadSatGti(p))
+                } catch (e: Exception) {
+                }
+                try {
+                    Extras.loadObsCloud(p)?.let { obsCloud = obsCloud + (p.id to it) }
                 } catch (e: Exception) {
                 }
             }
