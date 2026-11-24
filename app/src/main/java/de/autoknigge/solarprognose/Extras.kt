@@ -422,6 +422,23 @@ object Extras {
         return m
     }
 
+    /** Anteil Erneuerbarer/Solar an der Last laut Energy-Charts-Prognose (ren_share_forecast) zum Zeitpunkt ts: Paar (ren %, solar %) oder null. */
+    private fun renShareAt(ts: Long): Pair<Double, Double?>? {
+        try {
+            val o = JSONObject(Api.get("https://api.energy-charts.info/ren_share_forecast?country=de", false))
+            val t = o.getJSONArray("unix_seconds")
+            val r = o.optJSONArray("ren_share") ?: return null
+            val so = o.optJSONArray("solar_share")
+            var best = -1
+            for (i in 0 until minOf(t.length(), r.length())) if (t.getLong(i) <= ts && !r.isNull(i)) best = i
+            if (best < 0 || ts - t.getLong(best) > 3600L) return null
+            val sol = if (so != null && best < so.length() && !so.isNull(best)) so.getDouble(best) else null
+            return r.getDouble(best) to sol
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
     /** Hängt hinter den letzten Messwert bis jetzt vorläufige Punkte an: Solar und Wind aus der Prognose, alles andere fortgeschrieben. */
     private fun extendToNow(s: MixSeries, day: LocalDate): MixSeries {
         val n = s.t.size
@@ -463,6 +480,14 @@ object Extras {
             sShare = g("Solar") / load * 100.0
             rShare = (g("Solar") + g("Wind") + g("Biomasse") + g("Wasserkraft")) / load * 100.0
             sT = t2[lastI]
+        }
+        // Direkt aus der Energy-Charts-Prognose (Anteil an der prognostizierten Last), wenn verfügbar
+        renShareAt(t2[lastI])?.let { (rs, ss) ->
+            rShare = rs
+            if (ss != null) sShare = ss
+            sT = t2[lastI]
+            val ren = (v2["Solar"]?.get(lastI) ?: 0.0) + (v2["Wind"]?.get(lastI) ?: 0.0) + (v2["Biomasse"]?.get(lastI) ?: 0.0) + (v2["Wasserkraft"]?.get(lastI) ?: 0.0)
+            if (rs > 5.0 && ren > 1000.0) v2["Last"]?.let { it[lastI] = ren / (rs / 100.0) }
         }
         return MixSeries(t2, v2, s.hasTrade, sShare, rShare, sT, n)
     }
