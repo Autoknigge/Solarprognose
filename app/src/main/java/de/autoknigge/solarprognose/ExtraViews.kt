@@ -169,19 +169,22 @@ fun ModelCard(rows: List<ModelRow>, label0: String, label1: String) {
             return if (v == vs.max()) TileToday else if (v == vs.min()) TileTomorrow else Ink
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(" ", fontSize = 12.sp)
                 Text(label0, fontSize = 13.sp, color = Muted)
+                Text("🌞 Std.", fontSize = 12.sp, color = Muted)
                 Text(label1, fontSize = 13.sp, color = Muted)
-                Text("Sonne " + label0.substringBefore(" "), fontSize = 12.sp, color = Muted)
-                Text("Sonne " + label1.substringBefore(" "), fontSize = 12.sp, color = Muted)
+                Text("🌞 Std.", fontSize = 12.sp, color = Muted)
             }
-            for (r in rows) Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(r.name, fontSize = 12.sp, color = Gold, fontWeight = FontWeight.SemiBold)
-                Text(r.v0?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = tone(r.v0, rows.map { it.v0 }), fontWeight = FontWeight.Bold)
-                Text(r.v1?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = tone(r.v1, rows.map { it.v1 }), fontWeight = FontWeight.Bold)
-                Text(r.s0?.let { Calc.fmt1(it) + " h" } ?: "–", fontSize = 12.sp, color = Muted)
-                Text(r.s1?.let { Calc.fmt1(it) + " h" } ?: "–", fontSize = 12.sp, color = Muted)
+            for (r in rows) {
+                val frame = if (r.name == "ICON") Modifier.border(1.5.dp, Gold, RoundedCornerShape(12.dp)) else Modifier
+                Column(frame.padding(horizontal = 6.dp, vertical = 6.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(r.name, fontSize = 12.sp, color = Gold, fontWeight = FontWeight.SemiBold)
+                    Text(r.v0?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = tone(r.v0, rows.map { it.v0 }), fontWeight = FontWeight.Bold)
+                    Text(r.s0?.let { Calc.fmt1(it) + " h" } ?: "–", fontSize = 12.sp, color = Muted)
+                    Text(r.v1?.let { Calc.fmt1(it) } ?: "–", fontSize = 15.sp, color = tone(r.v1, rows.map { it.v1 }), fontWeight = FontWeight.Bold)
+                    Text(r.s1?.let { Calc.fmt1(it) + " h" } ?: "–", fontSize = 12.sp, color = Muted)
+                }
             }
         }
         Text(
