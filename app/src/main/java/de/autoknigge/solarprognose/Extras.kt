@@ -736,7 +736,8 @@ object Extras {
 
     /** Beobachtete Bewölkung (DWD über Bright Sky), auch nachts verfügbar. */
     suspend fun loadObsCloud(p: Plant): ObsCloud? = withContext(Dispatchers.IO) {
-        val o = JSONObject(Api.get("https://api.brightsky.dev/current_weather?lat=${p.lat}&lon=${p.lon}", false))
+        val q = if (p.obsStation.isNotBlank()) "dwd_station_id=${p.obsStation}" else "lat=${p.lat}&lon=${p.lon}"
+        val o = JSONObject(Api.get("https://api.brightsky.dev/current_weather?$q", false))
         val w = o.optJSONObject("weather") ?: return@withContext null
         if (w.isNull("cloud_cover")) return@withContext null
         // Die Station, die die Bewölkung liefert (kann eine Ersatzstation sein), samt Entfernung
@@ -746,8 +747,38 @@ object Extras {
         if (srcs != null) for (i in 0 until srcs.length()) if (srcs.optJSONObject(i)?.optInt("id", -2) == cid) src = srcs.optJSONObject(i)
         if (src == null) src = srcs?.optJSONObject(0)
         val name = src?.optString("station_name")?.takeIf { it.isNotBlank() }
+        // Entfernung: von Bright Sky, sonst aus den Koordinaten der Station (bei fest gewählter Station liefert Bright Sky keine)
         val km = src?.takeIf { it.has("distance") && !it.isNull("distance") }?.optDouble("distance")?.div(1000.0)
+            ?: src?.takeIf { it.has("lat") && it.has("lon") && !it.isNull("lat") && !it.isNull("lon") }?.let { distKm(p.lat, p.lon, it.getDouble("lat"), it.getDouble("lon")) }
         ObsCloud(w.getDouble("cloud_cover"), name, km)
+    }
+
+    private fun distKm(la1: Double, lo1: Double, la2: Double, lo2: Double): Double {
+        val r = 6371.0
+        val dLa = Math.toRadians(la2 - la1)
+        val dLo = Math.toRadians(lo2 - lo1)
+        val a = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(Math.toRadians(la1)) * Math.cos(Math.toRadians(la2)) * Math.sin(dLo / 2) * Math.sin(dLo / 2)
+        return 2 * r * Math.asin(Math.sqrt(a))
+    }
+
+    class ObsStation(val id: String, val name: String, val km: Double)
+
+    /** DWD-Stationen mit aktuellen Beobachtungen im Umkreis (Bright Sky), nächste zuerst. */
+    suspend fun loadObsStations(p: Plant): List<ObsStation> = withContext(Dispatchers.IO) {
+        val o = JSONObject(Api.get("https://api.brightsky.dev/sources?lat=${p.lat}&lon=${p.lon}&max_dist=80000", false))
+        val a = o.optJSONArray("sources") ?: return@withContext emptyList()
+        val seen = HashSet<String>()
+        val out = ArrayList<ObsStation>()
+        for (i in 0 until a.length()) {
+            val s = a.optJSONObject(i) ?: continue
+            if (s.optString("observation_type") != "current") continue
+            val id = s.optString("dwd_station_id").takeIf { it.isNotBlank() && it != "null" } ?: continue
+            if (!seen.add(id)) continue
+            val km = if (s.has("distance") && !s.isNull("distance")) s.optDouble("distance") / 1000.0
+            else if (s.has("lat") && s.has("lon") && !s.isNull("lat") && !s.isNull("lon")) distKm(p.lat, p.lon, s.getDouble("lat"), s.getDouble("lon")) else continue
+            out.add(ObsStation(id, s.optString("station_name", id), km))
+        }
+        out.sortedBy { it.km }.take(15)
     }
 
     /** Gemessene Einstrahlung (Satellit, auf die Modulfläche gerechnet) für heute: Zeit "yyyy-MM-ddTHH:mm" -> W/m². */

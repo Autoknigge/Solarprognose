@@ -382,6 +382,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 }
                 // Frühe Schätzung vor genug Satellitendaten: beobachtete Bewölkung (DWD) gegen Bewölkung des gewählten Modells
                 val obs = vm.obsCloud[plant.id]
+                var stationDialog by remember { mutableStateOf(false) }
+                if (stationDialog) ObsStationDialog(plant, { vm.setObsStation(plant, it); stationDialog = false }, { stationDialog = false })
                 var modelCloud: Double? = null
                 // Nur nach Sonnenaufgang: eine Beobachtung in der Nacht sagt nichts über die Bewölkung am Tag
                 val riseMin = sunNow?.first?.split(":")?.let { (it[0].toInt() * 60 + it[1].toInt()) }
@@ -433,7 +435,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val dayListA = dayList.map { adjDay(it) }
                 val total = dayListA.sumOf { it.kwh }
                 val best = dayListA.maxByOrNull { it.kwh } ?: adjDay(t0)
-                val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" + (it.station?.let { st -> " (" + st + (it.km?.let { k -> ", " + Calc.fmt0(k) + " km" } ?: "") + ")" } ?: "") } ?: "keine Daten") +
+                val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" } ?: "keine Daten") +
                     " · Satellit: " + (if (satMap == null) "keine Daten" else if (dCnt == 0) "noch keine vergleichbare Stunde" else dCnt.toString() + " Std., Messung " + Calc.fmt0(dSs / dCnt) + " gegen Modell " + Calc.fmt0(dSm / dCnt) + " W/m²") +
                     " · Korrektur " + Calc.fmt2(corr)
                 val rest = if (satIcon != null) restSel else restModel?.let { it * fk }
@@ -489,7 +491,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                     res
                 })
-                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, diag = diagText, satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher " + Calc.fmt0(it * 100) + " % des Modells " + selName + "). Modellprognose war " + Calc.fmt1(d0.kwh * modelFk) + " kWh." } ?: obsFactor?.let { "Frühe Schätzung nach beobachteter Bewölkung (DWD" + (obs?.station?.let { st -> ", " + st } ?: "") + ": " + Calc.fmt0(obs?.pct ?: 0.0) + " %, Modell: " + Calc.fmt0(modelCloud ?: 0.0) + " %). Modellprognose war " + Calc.fmt1(d0.kwh * modelFk) + " kWh." } ?: ("Modell " + selName + ". " + (spread(d0) ?: "") + " „Bisher“ aus dem Wetter berechnet, nicht gemessen."), nowKw = nowKw, sunTotal = adjDay(d0).sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } * (if (d0.sunH > 0.0) (adjDay(d0).sunH ?: d0.sunH) / d0.sunH else 1.0) })
+                else if (rest != null) TodayCard(total = d0.kwh * fk, rest = rest, diag = diagText, stationLabel = obs?.station?.let { st -> st + (obs?.km?.let { k -> ", " + Calc.fmt0(k) + " km" } ?: "") }, onStation = { stationDialog = true },satNote = satFactor?.let { "Korrigiert nach Satellitenmessung (Einstrahlung bisher " + Calc.fmt0(it * 100) + " % des Modells " + selName + "). Modellprognose war " + Calc.fmt1(d0.kwh * modelFk) + " kWh." } ?: obsFactor?.let { "Frühe Schätzung nach beobachteter Bewölkung (DWD" + (obs?.station?.let { st -> ", " + st } ?: "") + ": " + Calc.fmt0(obs?.pct ?: 0.0) + " %, Modell: " + Calc.fmt0(modelCloud ?: 0.0) + " %). Modellprognose war " + Calc.fmt1(d0.kwh * modelFk) + " kWh." } ?: ("Modell " + selName + ". " + (spread(d0) ?: "") + " „Bisher“ aus dem Wetter berechnet, nicht gemessen."), nowKw = nowKw, sunTotal = adjDay(d0).sunH, sunRest = nowC?.let { c -> if (d0.sunH == null) null else (Math.floor(c).toInt() + 1 until d0.end).sumOf { forecast.hours.getOrNull(it)?.sunH?.coerceAtLeast(0.0) ?: 0.0 } * (if (d0.sunH > 0.0) (adjDay(d0).sunH ?: d0.sunH) / d0.sunH else 1.0) })
 
                 fun scaleHours(f0: Forecast): Forecast {
                     val ratio = f0.days.associate { d -> d.date to (if (d.kwh > 0.0) adjDay(d).kwh / d.kwh else 1.0) }
@@ -1003,7 +1005,8 @@ fun PlantEditScreen(vm: MainViewModel, plantId: String?, canCancel: Boolean, onD
                                 az = az.roundToInt(),
                                 eff = (eff.toIntOrNull() ?: 80).coerceIn(40, 100),
                                 limitW = limit.toIntOrNull()?.coerceAtLeast(0) ?: 0,
-                                shades = shades
+                                shades = shades,
+                                obsStation = existing?.obsStation ?: ""
                             )
                         )
                         onDone()

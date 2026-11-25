@@ -277,6 +277,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (known && p.id in selectedIds) setSelection(selectedIds) else select(p.id)
     }
 
+    /** Andere DWD-Station für die beobachtete Bewölkung wählen (leer = automatisch). */
+    fun setObsStation(p: Plant, stationId: String) {
+        val np = p.copy(obsStation = stationId)
+        plants = plants.map { if (it.id == p.id) np else it }
+        store.savePlants(plants)
+        obsCloud = obsCloud - p.id
+        viewModelScope.launch {
+            try {
+                Extras.loadObsCloud(np)?.let { obsCloud = obsCloud + (p.id to it) }
+            } catch (e: Exception) {
+            }
+        }
+    }
+
     fun deletePlant(id: String) {
         plants = plants.filter { it.id != id }
         store.savePlants(plants)

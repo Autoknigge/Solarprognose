@@ -231,7 +231,7 @@ fun TomorrowCard(total: Double, sunTotal: Double?, firstKwh: String?) {
 }
 
 @Composable
-fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sunTotal: Double? = null, sunRest: Double? = null, satNote: String? = null, diag: String? = null) {
+fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sunTotal: Double? = null, sunRest: Double? = null, satNote: String? = null, diag: String? = null, stationLabel: String? = null, onStation: (() -> Unit)? = null) {
     val done = (total - rest).coerceAtLeast(0.0)
     val frac = if (total > 0.0) (done / total).toFloat().coerceIn(0f, 1f) else 0f
     SectionCard(title = "") {
@@ -251,7 +251,49 @@ fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sunTotal: Doub
             fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
         if (diag != null) Text(diag, fontSize = 10.sp, color = Muted.copy(alpha = 0.8f), lineHeight = 13.sp)
+        if (onStation != null) Row {
+            Text("DWD-Station: ", fontSize = 11.sp, color = Muted.copy(alpha = 0.8f))
+            Text(
+                (stationLabel ?: "automatisch") + " – ändern",
+                fontSize = 11.sp, color = Gold,
+                style = androidx.compose.ui.text.TextStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
+                modifier = Modifier.clickable { onStation() }
+            )
+        }
     }
+}
+
+/** Auswahl der DWD-Station für die beobachtete Bewölkung: Liste der nächsten Stationen mit Entfernung. */
+@Composable
+fun ObsStationDialog(plant: Plant, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    var list by remember { mutableStateOf<List<Extras.ObsStation>?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(plant.id) {
+        try { list = Extras.loadObsStations(plant) } catch (e: Exception) { failed = true }
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Schließen") } },
+        title = { Text("DWD-Station für die Bewölkung") },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Die beobachtete Bewölkung dieser Station korrigiert am Morgen die Tagesprognose. Nicht jede Station meldet Bewölkung; dann steht in der Diagnose „keine Daten“.", fontSize = 12.sp)
+                Spacer(Modifier.height(6.dp))
+                @Composable fun row(label: String, id: String) {
+                    val on = plant.obsStation == id
+                    Text(
+                        (if (on) "✓ " else "") + label, fontSize = 14.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.fillMaxWidth().clickable { onPick(id) }.padding(vertical = 8.dp)
+                    )
+                }
+                row("Automatisch (nächste Station mit Bewölkung)", "")
+                val l = list
+                if (l == null) Text(if (failed) "Stationsliste gerade nicht erreichbar." else "Lade Stationen …", fontSize = 12.sp)
+                else if (l.isEmpty()) Text("Keine Stationen im Umkreis gefunden.", fontSize = 12.sp)
+                else l.forEach { row(it.name + " · " + Calc.fmt0(it.km) + " km", it.id) }
+            }
+        }
+    )
 }
 
 @Composable

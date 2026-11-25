@@ -33,7 +33,9 @@ data class Plant(
     val az: Int,
     val eff: Int,
     val limitW: Int,
-    val shades: List<Shade> = emptyList()
+    val shades: List<Shade> = emptyList(),
+    /** DWD-Station für die beobachtete Bewölkung (Bright-Sky-Stations-ID); leer = automatisch die nächste mit Bewölkungsdaten. */
+    val obsStation: String = ""
 ) {
     /** Alles, was die Einstrahlungsdaten beim Anbieter beeinflusst. */
     val geoSig: String get() = "$lat,$lon,$tilt,$az"
@@ -50,6 +52,7 @@ data class Plant(
         .put("eff", eff)
         .put("limitW", limitW)
         .put("shades", JSONArray().also { a -> shades.forEach { a.put(it.toJson()) } })
+        .put("obsStation", obsStation)
 
     companion object {
         fun fromJson(o: JSONObject) = Plant(
@@ -65,7 +68,8 @@ data class Plant(
             limitW = o.optInt("limitW", 0),
             shades = o.optJSONArray("shades")?.let { a ->
                 (0 until a.length()).mapNotNull { i -> try { Shade.fromJson(a.getJSONObject(i)) } catch (e: Exception) { null } }
-            } ?: emptyList()
+            } ?: emptyList(),
+            obsStation = o.optString("obsStation", "")
         )
     }
 }
