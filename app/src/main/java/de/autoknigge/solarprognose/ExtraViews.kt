@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -446,12 +447,21 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                 Row(Modifier.weight(0.34f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     Text(label, fontSize = 13.sp, color = LocalInk.current)
                     if (name == "Erdgas" && gas != null) {
-                        Spacer(Modifier.weight(1f))
+                        Spacer(Modifier.width(8.dp))
                         val diff = gas.avg?.let { gas.full - it }
                         val bgc = when { diff == null -> Color(0xFF6B6B6B); diff >= 0.0 -> Color(0xFF1E8E4E); diff >= -15.0 -> Color(0xFFF59E1B); else -> Color(0xFFD32F2F) }
                         val fgc = if (diff != null && diff < 0.0 && diff >= -15.0) Color.Black else Color.White
-                        Box(Modifier.offset(y = 14.dp).size(36.dp).clip(androidx.compose.foundation.shape.CircleShape).background(bgc).clickable { showGas = !showGas }, contentAlignment = androidx.compose.ui.Alignment.Center) {
-                            Text(Calc.fmt0(gas.full) + "%", fontSize = 11.sp, color = fgc, fontWeight = FontWeight.Bold)
+                        val px = androidx.compose.ui.platform.LocalDensity.current.density
+                        val ball = Brush.radialGradient(
+                            listOf(androidx.compose.ui.graphics.lerp(bgc, Color.White, 0.45f), bgc, androidx.compose.ui.graphics.lerp(bgc, Color.Black, 0.55f)),
+                            center = Offset(10f * px, 8f * px), radius = 26f * px
+                        )
+                        Box(
+                            Modifier.size(30.dp).clip(androidx.compose.foundation.shape.CircleShape).background(ball)
+                                .border(1.5.dp, Gold, androidx.compose.foundation.shape.CircleShape).clickable { showGas = !showGas },
+                            contentAlignment = androidx.compose.ui.Alignment.Center
+                        ) {
+                            Text(Calc.fmt0(gas.full) + "%", fontSize = 10.sp, color = fgc, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
