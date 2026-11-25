@@ -546,6 +546,12 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                 (if (net >= 0) "Netto-Import (Import-Export) " else "Netto-Export (Export-Import) ") + Calc.fmt2(Math.abs(net)) + " GW",
                 fontSize = 12.sp, color = LocalMuted.current
             )
+            val zus = avg("ImportBilanz") / 1000.0
+            if (zus > 0.005) Text(
+                "Im Import enthalten: " + Calc.fmt2(zus) + " GW rechnerisch ergänzt (Bilanz: Erzeugung, Speicher netto, + Import - Export = Last). " +
+                    "Gemessen: " + Calc.fmt2((avg("Import") - avg("ImportBilanz")) / 1000.0) + " GW.",
+                fontSize = 11.5.sp, color = Color(0xFFE3B341), lineHeight = 15.sp
+            )
         }
         if (n > 1) {
             androidx.compose.material3.Slider(
@@ -564,7 +570,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
         }
         if (series.estFrom >= 0) Text("Vorläufig: ab " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(series.t[series.estFrom]).atZone(zone).hour, Instant.ofEpochSecond(series.t[series.estFrom]).atZone(zone).minute) + " Solar und Wind aus der Energy-Charts-Prognose, übrige Werte vom letzten Messwert fortgeschrieben.", fontSize = 10.5.sp, color = Color(0xFFE3B341), lineHeight = 14.sp)
         Text("CO₂: Schätzung aus dem Erzeugungsmix mit festen Durchschnittswerten je Energieträger, ohne Import. Keine amtliche Messung.", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
-        Text("Nettostromerzeugung der öffentlichen Stromversorgung ohne Eigenerzeugung der Industrie, Anteile an der Erzeugung. Import und Export: physikalische Flüsse über die Grenzen. Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
+        Text("Nettostromerzeugung der öffentlichen Stromversorgung ohne Eigenerzeugung der Industrie, Anteile an der Erzeugung. Import und Export: physikalische Flüsse über die Grenzen. Der Import ist eine saldierte Zahl: Fehlt in den Quelldaten Strom zur Deckung der Last, wird die Lücke als Import ergänzt (gelb ausgewiesen). Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
     }
 }
 

@@ -293,7 +293,7 @@ object Extras {
         val types = o.getJSONArray("production_types")
         val n = t.length()
         if (n == 0) return null
-        val keys = MIX_GROUPS + listOf("Import", "Export", "Braunkohle", "Steinkohle", "PumpLaden", "BattLaden", "Last")
+        val keys = MIX_GROUPS + listOf("Import", "Export", "Braunkohle", "Steinkohle", "PumpLaden", "BattLaden", "Last", "ImportBilanz")
         val raw = keys.associateWith { DoubleArray(n) }
         var last = -1
         var haveTrade = false
@@ -362,6 +362,20 @@ object Extras {
                 raw["Export"]!![i] = if (swap) en.value[0] else en.value[1]
             }
             haveTrade = true
+        }
+        // Bilanz: Erzeugung (Speicher netto) + Import - Export muss die Last decken. Fehlt etwas, wird der Import
+        // rechnerisch um die Lücke erhöht ("ImportBilanz" hält den ergänzten Anteil getrennt fest).
+        if (haveTrade) for (i in 0..last) {
+            val load = raw["Last"]!![i]
+            if (load < 1000.0) continue
+            var prod = 0.0
+            for (g in MIX_GROUPS) prod += raw[g]!![i]
+            prod -= raw["PumpLaden"]!![i] + raw["BattLaden"]!![i]
+            val gap = load - (prod + raw["Import"]!![i] - raw["Export"]!![i])
+            if (gap > 0.0) {
+                raw["Import"]!![i] += gap
+                raw["ImportBilanz"]!![i] = gap
+            }
         }
         val len = last + 1
         val step = Math.ceil(len / maxPoints.toDouble()).toInt().coerceAtLeast(1)
