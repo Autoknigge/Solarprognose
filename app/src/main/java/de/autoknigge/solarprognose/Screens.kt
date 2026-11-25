@@ -404,12 +404,27 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val restSel = restModel?.let { it * modelFk * corr }
                 val todayTotal = if (satIcon != null && restSel != null) (d0.kwh - (restModel ?: 0.0)) * satIcon + restSel else d0.kwh * modelFk * corr
                 val fk = if (d0.kwh > 0.0) todayTotal / d0.kwh else 1.0
+                // Abgeschlossene Tage (gestern, vorgestern, heute nach dem Abend-Umschalten): ganzer Tag aus der Satellitenmessung statt reinem Modellwert
+                fun satDay(d: Day): Double? {
+                    val sm = satMap ?: return null
+                    var ss = 0.0; var gg = 0.0; var cnt = 0
+                    for (h in (full ?: forecast).hours) {
+                        if (h.date != d.date || h.gti < 40.0) continue
+                        val sv = sm[h.time] ?: continue
+                        ss += sv; gg += h.gti; cnt++
+                    }
+                    if (cnt < 3 || gg < 150.0) return null
+                    val r = ss / gg
+                    return if (r < 0.85 || r > 1.15) Math.pow(r.coerceIn(0.05, 1.6), 0.75) else 1.0
+                }
                 // Tageswerte für Diagramme und Summen: gewähltes Modell
                 fun adjDay(d: Day): Day {
                     val sun = modelsMap?.get("$selModel#sun")?.get(d.date)
                     val sunScale = if (d.date == d0.date && !eveningSwitch) corr else 1.0
                     val d2 = if (sun != null) d.copy(sunH = sun * sunScale) else d.copy(sunH = d.sunH?.let { it * sunScale })
-                    val kw = if (d.date == d0.date && !eveningSwitch) todayTotal else (cmp(d, selModel) ?: d.kwh)
+                    val done = d.date < d0.date || (d.date == d0.date && eveningSwitch)
+                    val sd = if (done) satDay(d) else null
+                    val kw = if (d.date == d0.date && !eveningSwitch) todayTotal else if (sd != null) d.kwh * sd else (cmp(d, selModel) ?: d.kwh)
                     return d2.copy(kwh = kw, peak = if (d.kwh > 0.0) d.peak * kw / d.kwh else d.peak)
                 }
                 val dayListA = dayList.map { adjDay(it) }

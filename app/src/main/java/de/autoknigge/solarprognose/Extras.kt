@@ -717,7 +717,7 @@ object Extras {
         val o = JSONObject(
             Api.get(
                 "https://satellite-api.open-meteo.com/v1/archive?latitude=${p.lat}&longitude=${p.lon}&tilt=${p.tilt}&azimuth=${p.az}" +
-                    "&hourly=global_tilted_irradiance&models=satellite_radiation_seamless&start_date=$today&end_date=$today&timezone=auto", false
+                    "&hourly=global_tilted_irradiance&models=satellite_radiation_seamless&start_date=${today.minusDays(2)}&end_date=$today&timezone=auto", false
             )
         )
         val h = o.getJSONObject("hourly")
