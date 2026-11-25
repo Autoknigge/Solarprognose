@@ -150,6 +150,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val s = Extras.loadMixSeries(r)
                 if (s != null) mixSeries = mixSeries + (r to s) else mixFailed = mixFailed + r
+                if (s != null && r == 0) {
+                    val e = Extras.extendMixNow(s)
+                    if (e !== s) mixSeries = mixSeries + (0 to e)
+                }
             } catch (e: Exception) {
                 mixFailed = mixFailed + r
             }

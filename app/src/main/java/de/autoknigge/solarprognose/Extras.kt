@@ -522,6 +522,16 @@ object Extras {
         return MixSeries(t2, v2, s.hasTrade, sShare, rShare, sT, n)
     }
 
+    /** Ergänzt die Tagesreihe um vorläufige Punkte bis jetzt (Prognosen); dauert länger und kommt deshalb nach der Grundansicht. */
+    suspend fun extendMixNow(s: MixSeries): MixSeries = withContext(Dispatchers.IO) {
+        val today = LocalDate.now(berlin)
+        if (s.estFrom in 0 until s.t.size) return@withContext s
+        if (Instant.ofEpochSecond(s.t.last()).atZone(berlin).toLocalDate() != today) return@withContext s
+        val e = try { extendToNow(s, today) } catch (ex: Exception) { s }
+        if (e !== s) synchronized(mixCache) { mixCache[0] = System.currentTimeMillis() to e }
+        e
+    }
+
     /** range: 0 = Tag (heute, sonst gestern), 1 = Woche (7 Tage), 2 = Jahr (365 Tage). */
     suspend fun loadMixSeries(range: Int): MixSeries? = withContext(Dispatchers.IO) {
         val ttl = when (range) { 0 -> 20L * 60 * 1000; 1 -> 60L * 60 * 1000; else -> 6L * 3600 * 1000 }
@@ -541,9 +551,6 @@ object Extras {
             0 -> fetch(today, today, 96) ?: fetch(today.minusDays(1), today.minusDays(1), 96)
             1 -> fetch(today.minusDays(6), today, 168)
             else -> fetch(today.minusDays(364), today, 183)
-        }
-        if (s != null && range == 0 && Instant.ofEpochSecond(s.t.last()).atZone(berlin).toLocalDate() == today) {
-            s = try { extendToNow(s, today) } catch (e: Exception) { s }
         }
         if (s != null) synchronized(mixCache) { mixCache[range] = System.currentTimeMillis() to s }
         s
