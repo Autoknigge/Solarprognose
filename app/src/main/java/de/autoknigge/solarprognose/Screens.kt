@@ -420,7 +420,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 // Tageswerte für Diagramme und Summen: gewähltes Modell
                 fun adjDay(d: Day): Day {
                     val sun = modelsMap?.get("$selModel#sun")?.get(d.date)
-                    val sunScale = if (d.date == d0.date && !eveningSwitch) corr else 1.0
+                    val sunScale = if (d.date == d0.date && !eveningSwitch) corr else if (d.date < d0.date || d.date == d0.date) (satDay(d) ?: 1.0) else 1.0
                     val d2 = if (sun != null) d.copy(sunH = sun * sunScale) else d.copy(sunH = d.sunH?.let { it * sunScale })
                     val done = d.date < d0.date || (d.date == d0.date && eveningSwitch)
                     val sd = if (done) satDay(d) else null
