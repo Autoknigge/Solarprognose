@@ -387,7 +387,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
     val colors = mapOf(
         "Kohle" to Color(0xFFA9896B), "Erdgas" to Color(0xFFD4714F), "Biomasse" to Color(0xFF2E8B57),
         "Wind" to Color(0xFF4B5A9E), "Wasserkraft" to Color(0xFF5FD0E6), "Pumpspeicher" to Color(0xFF7FA6D9), "Batterie" to Color(0xFFB07CD8), "Solar" to Color(0xFFE3B341), "Sonstige" to Color(0xFFA0A0A0),
-        "Import" to Color(0xFFE8607A), "Export" to Color(0xFF9DBF5B)
+        "Import" to Color(0xFFF94001), "Export" to Color(0xFF9DBF5B)
     )
     val zone = remember { ZoneId.of("Europe/Berlin") }
     var sel by remember(series) { mutableStateOf<Int?>(series?.t?.let { it.size - 1 }) }
