@@ -732,15 +732,22 @@ object Extras {
         g
     }
 
-    class ObsCloud(val pct: Double, val station: String?)
+    class ObsCloud(val pct: Double, val station: String?, val km: Double? = null)
 
     /** Beobachtete Bewölkung (DWD über Bright Sky), auch nachts verfügbar. */
     suspend fun loadObsCloud(p: Plant): ObsCloud? = withContext(Dispatchers.IO) {
         val o = JSONObject(Api.get("https://api.brightsky.dev/current_weather?lat=${p.lat}&lon=${p.lon}", false))
         val w = o.optJSONObject("weather") ?: return@withContext null
         if (w.isNull("cloud_cover")) return@withContext null
-        val src = o.optJSONArray("sources")?.optJSONObject(0)?.optString("station_name")?.takeIf { it.isNotBlank() }
-        ObsCloud(w.getDouble("cloud_cover"), src)
+        // Die Station, die die Bewölkung liefert (kann eine Ersatzstation sein), samt Entfernung
+        val srcs = o.optJSONArray("sources")
+        val cid = w.optJSONObject("fallback_source_ids")?.optInt("cloud_cover", -1)?.takeIf { it >= 0 } ?: w.optInt("source_id", -1)
+        var src: JSONObject? = null
+        if (srcs != null) for (i in 0 until srcs.length()) if (srcs.optJSONObject(i)?.optInt("id", -2) == cid) src = srcs.optJSONObject(i)
+        if (src == null) src = srcs?.optJSONObject(0)
+        val name = src?.optString("station_name")?.takeIf { it.isNotBlank() }
+        val km = src?.takeIf { it.has("distance") && !it.isNull("distance") }?.optDouble("distance")?.div(1000.0)
+        ObsCloud(w.getDouble("cloud_cover"), name, km)
     }
 
     /** Gemessene Einstrahlung (Satellit, auf die Modulfläche gerechnet) für heute: Zeit "yyyy-MM-ddTHH:mm" -> W/m². */

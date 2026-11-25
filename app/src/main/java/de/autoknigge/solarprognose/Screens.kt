@@ -433,7 +433,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val dayListA = dayList.map { adjDay(it) }
                 val total = dayListA.sumOf { it.kwh }
                 val best = dayListA.maxByOrNull { it.kwh } ?: adjDay(t0)
-                val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" + (it.station?.let { st -> " (" + st + ")" } ?: "") } ?: "keine Daten") +
+                val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" + (it.station?.let { st -> " (" + st + (it.km?.let { k -> ", " + Calc.fmt0(k) + " km" } ?: "") + ")" } ?: "") } ?: "keine Daten") +
                     " · Satellit: " + (if (satMap == null) "keine Daten" else if (dCnt == 0) "noch keine vergleichbare Stunde" else dCnt.toString() + " Std., Messung " + Calc.fmt0(dSs / dCnt) + " gegen Modell " + Calc.fmt0(dSm / dCnt) + " W/m²") +
                     " · Korrektur " + Calc.fmt2(corr)
                 val rest = if (satIcon != null) restSel else restModel?.let { it * fk }
