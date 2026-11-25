@@ -606,7 +606,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
             }
 
             Text(
-                "Wetterdaten: Open-Meteo.com (CC BY 4.0). Jahreswerte: PVGIS, Europäische Kommission (JRC). Börsenpreise: Energy-Charts, Fraunhofer ISE (CC BY 4.0).",
+                "Wetterdaten: Open-Meteo.com (CC BY 4.0). Jahreswerte: PVGIS, Europäische Kommission (JRC). Börsenpreise: Energy-Charts, Fraunhofer ISE (CC BY 4.0). Gasspeicher: GIE AGSI+.",
                 fontSize = 11.5.sp, color = Muted, lineHeight = 16.sp
             )
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {

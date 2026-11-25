@@ -464,7 +464,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
             if (name == "Erdgas" && gas != null && showGas) {
                 Text(
                     "Gasspeicher Deutschland: " + Calc.fmt1(gas.full) + " % gefüllt (Stand " + gas.date.substring(8, 10) + "." + gas.date.substring(5, 7) + ".)" +
-                        (gas.avg?.let { ", Durchschnitt der letzten 5 Jahre zu dieser Zeit " + Calc.fmt1(it) + " %" } ?: ""),
+                        (gas.avg?.let { ", Durchschnitt der letzten 5 Jahre zu dieser Zeit " + Calc.fmt1(it) + " %" } ?: "") + ". Quelle: GIE AGSI+",
                     fontSize = 11.sp, color = LocalMuted.current, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
                 )
             }
