@@ -580,7 +580,8 @@ object Extras {
             return parseMixSeries(pj, max, trade, if (trade != null && trade.isNotEmpty()) src else "")
         }
         var s = when (range) {
-            0 -> fetch(today, today, 96) ?: fetch(today.minusDays(1), today.minusDays(1), 96)
+            // Kurz nach Mitternacht hat Energy-Charts für heute noch keine (oder keine brauchbaren) Daten: dann gestern zeigen
+            0 -> (try { fetch(today, today, 96) } catch (e: Exception) { null }) ?: fetch(today.minusDays(1), today.minusDays(1), 96)
             1 -> fetch(today.minusDays(6), today, 168)
             else -> fetch(today.minusDays(364), today, 183)
         }

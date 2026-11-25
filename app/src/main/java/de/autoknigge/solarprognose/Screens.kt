@@ -175,7 +175,8 @@ fun Tile(
     icon: WeatherKind? = null,
     bg: androidx.compose.ui.graphics.Color = Panel2,
     mutedColor: androidx.compose.ui.graphics.Color = Muted,
-    inkColor: androidx.compose.ui.graphics.Color = Ink
+    inkColor: androidx.compose.ui.graphics.Color = Ink,
+    foot: String? = null
 ) {
     val shape = RoundedCornerShape(14.dp)
     Box(
@@ -192,6 +193,7 @@ fun Tile(
                 if (unit != null) Text(" $unit", fontSize = 13.sp, color = mutedColor, modifier = Modifier.padding(bottom = 4.dp))
             }
             Text(note, fontSize = 12.sp, color = mutedColor, lineHeight = 16.sp)
+            if (foot != null) Text(foot, fontSize = 10.5.sp, color = mutedColor.copy(alpha = 0.85f), lineHeight = 14.sp)
         }
         if (icon != null) WeatherIcon(icon, Modifier.align(Alignment.TopEnd))
     }
@@ -435,7 +437,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val dayListA = dayList.map { adjDay(it) }
                 val total = dayListA.sumOf { it.kwh }
                 val best = dayListA.maxByOrNull { it.kwh } ?: adjDay(t0)
-                val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" } ?: "keine Daten") +
+                val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" + (it.station?.let { st -> " (" + st + (it.km?.let { k -> ", " + Calc.fmt0(k) + " km" } ?: "") + ")" } ?: "") } ?: "keine Daten") +
                     " · Satellit: " + (if (satMap == null) "keine Daten" else if (dCnt == 0) "noch keine vergleichbare Stunde" else dCnt.toString() + " Std., Messung " + Calc.fmt0(dSs / dCnt) + " gegen Modell " + Calc.fmt0(dSm / dCnt) + " W/m²") +
                     " · Korrektur " + Calc.fmt2(corr)
                 val rest = if (satIcon != null) restSel else restModel?.let { it * fk }
@@ -465,9 +467,25 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         WeatherIcon(Extras.kindOfHour(curH), Modifier.align(Alignment.CenterEnd))
                     }
                 }
+                // Erste volle kWh des Tages: Stundenleistung (nach gewähltem Modell und Korrektur) aufsummiert, innerhalb der Stunde interpoliert
+                val firstKwh: String? = if (eveningSwitch) null else {
+                    var cum = 0.0
+                    var res: String? = null
+                    for (i in d0.start until minOf(d0.end, forecast.hours.size)) {
+                        val e = forecast.hours[i].power / 1000.0 * fk
+                        if (e <= 0.0) continue
+                        if (cum + e >= 1.0) {
+                            val mins = Math.round(((forecast.hours[i].hour - 1) + (1.0 - cum) / e) * 60.0).toInt()
+                            res = String.format(Locale.GERMANY, "%02d:%02d", mins / 60, mins % 60)
+                            break
+                        }
+                        cum += e
+                    }
+                    if (res != null) "Erste volle kWh um $res Uhr" else "Heute keine volle kWh"
+                }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile(if (eveningSwitch) "Morgen" else "Heute", Calc.fmt1(if (eveningSwitch) adjDay(t0).kwh else t0.kwh * fk), "kWh", if (eveningSwitch) (spread(t0)?.let { it + "\n" } ?: "") + "Spitze " + Calc.fmt0(t0.peak) + " W gegen " + t0.peakHour + " Uhr" else if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",
-                        Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(t0), bg = TileToday, mutedColor = Color(0xFFFFE6DA))
+                        Modifier.weight(1f).fillMaxHeight(), icon = Extras.kindOf(t0), bg = TileToday, mutedColor = Color(0xFFFFE6DA), foot = firstKwh)
                     Tile(if (eveningSwitch) "Übermorgen" else "Morgen", t1?.let { Calc.fmt1(adjDay(it).kwh) } ?: "–", "kWh", t1?.let { (spread(t1)?.let { q -> q + "\n" } ?: "") + "Spitze " + Calc.fmt0(it.peak) + " W gegen " + it.peakHour + " Uhr" } ?: "",
                         Modifier.weight(1f).fillMaxHeight(), icon = t1?.let { Extras.kindOf(it) }, bg = TileTomorrow, mutedColor = Color(0xFFFFEBD6))
                 }

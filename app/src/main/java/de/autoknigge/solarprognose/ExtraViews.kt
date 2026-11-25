@@ -250,15 +250,17 @@ fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sunTotal: Doub
                 (if (satNote != null) satNote else "„Bisher“ aus dem Wetter berechnet, nicht gemessen."),
             fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
-        if (diag != null) Text(diag, fontSize = 10.sp, color = Muted.copy(alpha = 0.8f), lineHeight = 13.sp)
-        if (onStation != null) Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("DWD-Station", fontSize = 11.sp, color = Muted.copy(alpha = 0.8f))
-            Spacer(Modifier.width(8.dp))
-            Box(
-                Modifier.clip(RoundedCornerShape(50)).border(1.dp, Gold, RoundedCornerShape(50))
-                    .clickable { onStation() }.padding(horizontal = 12.dp, vertical = 5.dp)
-            ) {
-                Text((stationLabel ?: "automatisch") + "  ▾", fontSize = 12.sp, color = Gold, fontWeight = FontWeight.SemiBold)
+        if (diag != null || onStation != null) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            if (diag != null) Text(diag, fontSize = 10.sp, color = Muted.copy(alpha = 0.8f), lineHeight = 13.sp, modifier = Modifier.weight(1f))
+            else Spacer(Modifier.weight(1f))
+            if (onStation != null) {
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, Gold, RoundedCornerShape(12.dp))
+                        .clickable { onStation() }.padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text("DWD-Station\nändern", fontSize = 11.sp, lineHeight = 13.sp, color = Gold, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
             }
         }
     }
