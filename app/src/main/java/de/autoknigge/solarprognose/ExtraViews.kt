@@ -456,12 +456,43 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                             listOf(androidx.compose.ui.graphics.lerp(bgc, Color.White, 0.45f), bgc, androidx.compose.ui.graphics.lerp(bgc, Color.Black, 0.55f)),
                             center = Offset(10f * px, 8f * px), radius = 26f * px
                         )
+                        val frac = (gas.full / 100.0).toFloat().coerceIn(0f, 1f)
+                        val emptyCol = androidx.compose.ui.graphics.lerp(bgc, Color.Black, 0.62f)
                         Box(
-                            Modifier.size(30.dp).clip(androidx.compose.foundation.shape.CircleShape).background(ball)
+                            Modifier.size(30.dp).clip(androidx.compose.foundation.shape.CircleShape)
                                 .border(1.5.dp, Gold, androidx.compose.foundation.shape.CircleShape).clickable { showGas = !showGas },
                             contentAlignment = androidx.compose.ui.Alignment.Center
                         ) {
-                            Text(Calc.fmt0(gas.full) + "%", fontSize = 10.sp, color = fgc, fontWeight = FontWeight.Bold)
+                            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                                val w = size.width
+                                val h = size.height
+                                drawRect(emptyCol)
+                                val level = h * (1f - frac)
+                                val amp = h * 0.045f
+                                val wave = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(0f, level)
+                                    var x = 0f
+                                    while (x <= w) {
+                                        lineTo(x, level + amp * Math.sin(x / w * 2.0 * Math.PI * 1.5).toFloat())
+                                        x += 1f
+                                    }
+                                    lineTo(w, h); lineTo(0f, h); close()
+                                }
+                                drawPath(wave, ball)
+                                val line = androidx.compose.ui.graphics.Path().apply {
+                                    var x = 0f
+                                    moveTo(0f, level)
+                                    while (x <= w) {
+                                        lineTo(x, level + amp * Math.sin(x / w * 2.0 * Math.PI * 1.5).toFloat())
+                                        x += 1f
+                                    }
+                                }
+                                drawPath(line, Color(0xCCFFFFFF), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()))
+                            }
+                            Text(
+                                Calc.fmt0(gas.full) + "%", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold,
+                                style = androidx.compose.ui.text.TextStyle(shadow = androidx.compose.ui.graphics.Shadow(Color.Black, Offset(0f, 0f), 4f))
+                            )
                         }
                     }
                 }
