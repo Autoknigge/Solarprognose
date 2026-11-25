@@ -251,14 +251,15 @@ fun TodayCard(total: Double, rest: Double, nowKw: Double? = null, sunTotal: Doub
             fontSize = 11.sp, color = Muted, lineHeight = 15.sp
         )
         if (diag != null) Text(diag, fontSize = 10.sp, color = Muted.copy(alpha = 0.8f), lineHeight = 13.sp)
-        if (onStation != null) Row {
-            Text("DWD-Station: ", fontSize = 11.sp, color = Muted.copy(alpha = 0.8f))
-            Text(
-                (stationLabel ?: "automatisch") + " – ändern",
-                fontSize = 11.sp, color = Gold,
-                style = androidx.compose.ui.text.TextStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
-                modifier = Modifier.clickable { onStation() }
-            )
+        if (onStation != null) Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("DWD-Station", fontSize = 11.sp, color = Muted.copy(alpha = 0.8f))
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier.clip(RoundedCornerShape(50)).border(1.dp, Gold, RoundedCornerShape(50))
+                    .clickable { onStation() }.padding(horizontal = 12.dp, vertical = 5.dp)
+            ) {
+                Text((stationLabel ?: "automatisch") + "  ▾", fontSize = 12.sp, color = Gold, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
