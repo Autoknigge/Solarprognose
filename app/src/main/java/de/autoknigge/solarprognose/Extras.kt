@@ -548,7 +548,12 @@ object Extras {
         fun fetch(from: LocalDate, to: LocalDate, max: Int): MixSeries? {
             val base = "https://api.energy-charts.info"
             val pj = ecGet("$base/public_power?country=de&start=$from&end=$to")
+            // Physikalische Flüsse (cbpf) entsprechen der Bilanz; der Handelssaldo (cbet) weicht je Grenze deutlich ab und dient nur als Rückfall
             val trade = try {
+                cbetMap(ecGet("$base/cbpf?country=de&start=$from&end=$to")).takeIf { it.isNotEmpty() }
+            } catch (e: Exception) {
+                null
+            } ?: try {
                 cbetMap(ecGet("$base/cbet?country=de&start=$from&end=$to"))
             } catch (e: Exception) {
                 null

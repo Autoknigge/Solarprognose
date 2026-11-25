@@ -439,7 +439,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
             0 -> "Heute bis " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(lastT + 900).atZone(zone).hour, Instant.ofEpochSecond(lastT + 900).atZone(zone).minute)
             else -> "Durchschnitt $first bis ${fmt(lastT, false)}"
         }
-        Text(head + " · Erzeugung " + Calc.fmt1(prod / 1000.0) + " GW" + (series.v["Last"]?.let { la -> (if (s != null) la[s.coerceIn(0, n - 1)] else la.average()) }?.takeIf { it > 1000.0 }?.let { " · Last " + Calc.fmt1(it / 1000.0) + " GW" } ?: "") + " (Prozent = Anteil an der Erzeugung)", fontSize = 12.sp, color = LocalMuted.current)
+        Text(head + " · Erzeugung " + Calc.fmt1(prod / 1000.0) + " GW" + (series.v["Last"]?.let { la -> (if (s != null) la[s.coerceIn(0, n - 1)] else la.average()) }?.takeIf { it > 1000.0 }?.let { " · Last (öffentlich, ohne Eigenverbrauch) " + Calc.fmt1(it / 1000.0) + " GW" } ?: "") + " (Prozent = Anteil an der Erzeugung)", fontSize = 12.sp, color = LocalMuted.current)
         val top = MIX_GROUPS_UI.maxOf { avg(it) / prod * 100.0 }.coerceAtLeast(1.0)
         @Composable fun bar(name: String, label: String, gwOnly: Boolean = false) {
             val pct = avg(name) / prod * 100.0
@@ -564,7 +564,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
         }
         if (series.estFrom >= 0) Text("Vorläufig: ab " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(series.t[series.estFrom]).atZone(zone).hour, Instant.ofEpochSecond(series.t[series.estFrom]).atZone(zone).minute) + " Solar und Wind aus der Energy-Charts-Prognose, übrige Werte vom letzten Messwert fortgeschrieben.", fontSize = 10.5.sp, color = Color(0xFFE3B341), lineHeight = 14.sp)
         Text("CO₂: Schätzung aus dem Erzeugungsmix mit festen Durchschnittswerten je Energieträger, ohne Import. Keine amtliche Messung.", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
-        Text("Nettostromerzeugung der öffentlichen Stromversorgung, Anteile an der Erzeugung. Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
+        Text("Nettostromerzeugung der öffentlichen Stromversorgung ohne Eigenerzeugung der Industrie, Anteile an der Erzeugung. Import und Export: physikalische Flüsse über die Grenzen. Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
     }
 }
 
