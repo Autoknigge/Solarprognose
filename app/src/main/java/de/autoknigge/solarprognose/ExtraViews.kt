@@ -390,7 +390,8 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
         "Import" to Color(0xFFF94001), "Export" to Color(0xFF9DBF5B)
     )
     val zone = remember { ZoneId.of("Europe/Berlin") }
-    var sel by remember(series) { mutableStateOf<Int?>(series?.t?.let { it.size - 1 }) }
+    // Tag: letzter Zeitpunkt (aktuell). Woche und Jahr: zuerst der Durchschnitt des ganzen Zeitraums, ein Zeitpunkt nur nach Antippen.
+    var sel by remember(series, range) { mutableStateOf<Int?>(if (range == 0) series?.t?.let { it.size - 1 } else null) }
     // CO2 je kWh: aus dem Erzeugungsmix mit festen Durchschnittsfaktoren geschätzt (Energy-Charts liefert dafür keine Daten)
     val co2 = series?.let { sr ->
         val nn = sr.t.size
