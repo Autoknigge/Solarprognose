@@ -346,12 +346,20 @@ object Extras {
         // Handel über alle Grenzen einzeln (brutto): Import = Summe aller Einfuhren, Export = Summe aller Ausfuhren.
         // Die Gesamtzeile aus public_power ist nur der Saldo und würde Import und Export gegeneinander aufrechnen.
         if (cbet != null && cbet.isNotEmpty()) {
+            // Vorzeichen prüfen: Der Saldo der Einzelgrenzen muss zur Gesamtzeile aus public_power passen. Sonst sind Import und Export vertauscht.
+            var dot = 0.0
+            if (haveTrade) for (i in 0..last) {
+                val en = cbet.floorEntry(t.getLong(i)) ?: continue
+                if (t.getLong(i) - en.key > 3600L) continue
+                dot += (raw["Import"]!![i] - raw["Export"]!![i]) * (en.value[0] - en.value[1])
+            }
+            val swap = dot < 0.0
             for (i in 0..last) {
                 val ts = t.getLong(i)
                 val en = cbet.floorEntry(ts) ?: continue
                 if (ts - en.key > 3600L) continue
-                raw["Import"]!![i] = en.value[0]
-                raw["Export"]!![i] = en.value[1]
+                raw["Import"]!![i] = if (swap) en.value[1] else en.value[0]
+                raw["Export"]!![i] = if (swap) en.value[0] else en.value[1]
             }
             haveTrade = true
         }
