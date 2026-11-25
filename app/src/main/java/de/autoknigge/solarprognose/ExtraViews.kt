@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -379,7 +381,8 @@ fun PriceCard(prices: List<PriceHour>, nowSec: Long) {
 
 /** Strommix Deutschland (Energy-Charts): Tag/Woche/Jahr, Schieber für einzelne Zeitpunkte, Import und Export. */
 @Composable
-fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> Unit) {
+fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStorage?, onRange: (Int) -> Unit) {
+    var showGas by remember { mutableStateOf(false) }
     val colors = mapOf(
         "Kohle" to Color(0xFFD4714F), "Erdgas" to Color(0xFFA9896B), "Biomasse" to Color(0xFF9DBF5B),
         "Wind" to Color(0xFF2E8B57), "Wasserkraft" to Color(0xFF4B5A9E), "Pumpspeicher" to Color(0xFF7FA6D9), "Batterie" to Color(0xFFB07CD8), "Solar" to Color(0xFFE3B341), "Sonstige" to Color(0xFFA0A0A0),
@@ -440,12 +443,30 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, onRange: (Int) -> U
             val pct = avg(name) / prod * 100.0
             val w = ((pct / top) * 0.78).toFloat().coerceIn(0.01f, 0.78f)
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text(label, fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.weight(0.34f))
+                Row(Modifier.weight(0.34f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(label, fontSize = 13.sp, color = LocalInk.current)
+                    if (name == "Erdgas" && gas != null) {
+                        Spacer(Modifier.weight(1f))
+                        val diff = gas.avg?.let { gas.full - it }
+                        val bgc = when { diff == null -> Color(0xFF6B6B6B); diff >= 0.0 -> Color(0xFF1E8E4E); diff >= -15.0 -> Color(0xFFF59E1B); else -> Color(0xFFD32F2F) }
+                        val fgc = if (diff != null && diff < 0.0 && diff >= -15.0) Color.Black else Color.White
+                        Box(Modifier.offset(y = 14.dp).size(36.dp).clip(androidx.compose.foundation.shape.CircleShape).background(bgc).clickable { showGas = !showGas }, contentAlignment = androidx.compose.ui.Alignment.Center) {
+                            Text(Calc.fmt0(gas.full) + "%", fontSize = 11.sp, color = fgc, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
                 Row(Modifier.weight(0.66f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     Box(Modifier.weight(w).height(22.dp).background(colors[name] ?: Color.Gray))
                     Text(if (gwOnly) Calc.fmt2(avg(name) / 1000.0) + " GW" else Calc.fmt1(pct) + " % · " + Calc.fmt1(avg(name) / 1000.0) + " GW", fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.padding(start = 6.dp), maxLines = 1)
                     Box(Modifier.weight((1f - w).coerceAtLeast(0.01f)))
                 }
+            }
+            if (name == "Erdgas" && gas != null && showGas) {
+                Text(
+                    "Gasspeicher Deutschland: " + Calc.fmt1(gas.full) + " % gefüllt (Stand " + gas.date.substring(8, 10) + "." + gas.date.substring(5, 7) + ".)" +
+                        (gas.avg?.let { ", Durchschnitt der letzten 5 Jahre zu dieser Zeit " + Calc.fmt1(it) + " %" } ?: ""),
+                    fontSize = 11.sp, color = LocalMuted.current, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                )
             }
         }
         val scaleGw = (top / 100.0 * prod / 1000.0).coerceAtLeast(0.5)

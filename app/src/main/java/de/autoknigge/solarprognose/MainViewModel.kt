@@ -52,6 +52,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var profileFailed by mutableStateOf(false)
         private set
+    var gas by mutableStateOf<Extras.GasStorage?>(null)
     var mixRange by mutableStateOf(0)
     var mixSeries by mutableStateOf<Map<Int, MixSeries>>(emptyMap())
     var mixFailed by mutableStateOf<Set<Int>>(emptySet())
@@ -126,6 +127,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 } catch (e: Exception) {
                     profileFailed = true
                 }
+            }
+        }
+        viewModelScope.launch {
+            try {
+                gas = Extras.loadGas() ?: gas
+            } catch (e: Exception) {
             }
         }
         loadMixRange(0)

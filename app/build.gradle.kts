@@ -30,6 +30,7 @@ android {
 
         buildConfigField("String", "API_BASE_URL", "\"$apiBase\"")
         buildConfigField("String", "APP_TOKEN", "\"$appToken\"")
+        buildConfigField("String", "AGSI_KEY", "\"${setting("AGSI_KEY", "")}\"")
         manifestPlaceholders["appLabel"] = "@string/app_name"
     }
 

@@ -548,7 +548,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 }
 
                 vm.mixSeries[0]?.let { GridNowCard(it) }
-                MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed) { vm.selectMix(it) }
+                MixCard(vm.mixRange, vm.mixSeries[vm.mixRange], vm.mixRange in vm.mixFailed, vm.gas) { vm.selectMix(it) }
                 SectionCard(
                     title = "Bewölkung und Temperatur",
                     bg = Color(0xFFD24E01),

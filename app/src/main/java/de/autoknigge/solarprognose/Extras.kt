@@ -645,6 +645,54 @@ object Extras {
         out
     }
 
+    class GasStorage(val full: Double, val avg: Double?, val date: String)
+
+    private var gasCache: Pair<Long, GasStorage>? = null
+
+    /** Füllstand der deutschen Gasspeicher (AGSI+/GIE) und Durchschnitt derselben Tage der letzten 5 Jahre. Ohne Schlüssel null. */
+    suspend fun loadGas(): GasStorage? = withContext(Dispatchers.IO) {
+        val key = BuildConfig.AGSI_KEY.trim()
+        if (key.isBlank()) return@withContext null
+        gasCache?.let { if (System.currentTimeMillis() - it.first < 6L * 3600 * 1000) return@withContext it.second }
+        fun fetch(from: LocalDate, to: LocalDate): org.json.JSONArray? {
+            val c = java.net.URL("https://agsi.gie.eu/api?country=de&from=$from&to=$to&size=20").openConnection() as java.net.HttpURLConnection
+            c.connectTimeout = 15000
+            c.readTimeout = 30000
+            c.setRequestProperty("x-key", key)
+            c.setRequestProperty("User-Agent", "Solarprognose-Android/" + BuildConfig.VERSION_NAME)
+            try {
+                if (c.responseCode !in 200..299) return null
+                return JSONObject(c.inputStream.bufferedReader().use { it.readText() }).optJSONArray("data")
+            } finally {
+                c.disconnect()
+            }
+        }
+        val today = LocalDate.now(berlin)
+        val cur = fetch(today.minusDays(5), today) ?: return@withContext null
+        var best: LocalDate? = null
+        var full = 0.0
+        for (i in 0 until cur.length()) {
+            val o = cur.getJSONObject(i)
+            val dt = LocalDate.parse(o.getString("gasDayStart"))
+            val f = o.optString("full").toDoubleOrNull() ?: continue
+            if (best == null || dt.isAfter(best)) { best = dt; full = f }
+        }
+        val bd = best ?: return@withContext null
+        val past = ArrayList<Double>()
+        for (n in 1..5) {
+            try {
+                val dd = bd.minusYears(n.toLong())
+                val arr = fetch(dd, dd)
+                val v = arr?.optJSONObject(0)?.optString("full")?.toDoubleOrNull()
+                if (v != null) past.add(v)
+            } catch (e: Exception) {
+            }
+        }
+        val g = GasStorage(full, if (past.size >= 3) past.average() else null, bd.toString())
+        gasCache = System.currentTimeMillis() to g
+        g
+    }
+
     class ObsCloud(val pct: Double, val station: String?)
 
     /** Beobachtete Bewölkung (DWD über Bright Sky), auch nachts verfügbar. */

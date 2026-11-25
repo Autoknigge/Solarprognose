@@ -24,6 +24,7 @@ jobs:
       KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       API_BASE_URL: ${{ secrets.API_BASE_URL }}
       APP_TOKEN: ${{ secrets.APP_TOKEN }}
+      AGSI_KEY: ${{ secrets.AGSI_KEY }}
     steps:
       - uses: actions/checkout@v4
 
