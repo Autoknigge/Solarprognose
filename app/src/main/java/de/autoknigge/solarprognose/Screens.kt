@@ -397,10 +397,10 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         if (obs.pct >= 85.0 && f < 0.75) f.coerceIn(0.15, 1.0) else null
                     }
                 }
-                // Gedämpft (Exponent 0,8): Satellit und DWD unterschätzen bei dichter Decke das tatsächliche Licht
-                val corr = Math.pow(satFactor ?: obsFactor ?: 1.0, 0.8)
+                // Gedämpft (Exponent 0,75): Satellit und DWD unterschätzen bei dichter Decke das tatsächliche Licht
+                val corr = Math.pow(satFactor ?: obsFactor ?: 1.0, 0.75)
                 // Mit Satellitenmessung: vergangener Teil des Tages aus der Messung, Rest nach gewähltem Modell mit demselben gedämpften Faktor. Sonst Tageswert des Modells (ggf. nach DWD-Bewölkung).
-                val satIcon = if (satFactor != null && dSmIcon > 0.0) Math.pow(dSs / dSmIcon, 0.8) else null
+                val satIcon = if (satFactor != null && dSmIcon > 0.0) Math.pow(dSs / dSmIcon, 0.75) else null
                 val restSel = restModel?.let { it * modelFk * corr }
                 val todayTotal = if (satIcon != null && restSel != null) (d0.kwh - (restModel ?: 0.0)) * satIcon + restSel else d0.kwh * modelFk * corr
                 val fk = if (d0.kwh > 0.0) todayTotal / d0.kwh else 1.0
