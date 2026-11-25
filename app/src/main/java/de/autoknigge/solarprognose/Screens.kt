@@ -397,7 +397,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         if (obs.pct >= 85.0 && f < 0.75) f.coerceIn(0.15, 1.0) else null
                     }
                 }
-                val corr = satFactor ?: obsFactor ?: 1.0
+                // Gedämpft (Exponent 0,8): Satellit und DWD unterschätzen bei dichter Decke das tatsächliche Licht
+                val corr = Math.pow(satFactor ?: obsFactor ?: 1.0, 0.8)
                 val fk = modelFk * corr
                 // Tageswerte für Diagramme und Summen: gewähltes Modell
                 fun adjDay(d: Day): Day {
