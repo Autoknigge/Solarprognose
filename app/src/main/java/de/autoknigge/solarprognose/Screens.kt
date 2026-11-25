@@ -383,7 +383,10 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 // Frühe Schätzung vor genug Satellitendaten: beobachtete Bewölkung (DWD) gegen Bewölkung des gewählten Modells
                 val obs = vm.obsCloud[plant.id]
                 var modelCloud: Double? = null
-                val obsFactor: Double? = if (satFactor != null || obs == null || nowC == null || eveningSwitch) null else {
+                // Nur nach Sonnenaufgang: eine Beobachtung in der Nacht sagt nichts über die Bewölkung am Tag
+                val riseMin = sunNow?.first?.split(":")?.let { (it[0].toInt() * 60 + it[1].toInt()) }
+                val beforeRise = riseMin == null || nowZ.hour * 60 + nowZ.minute < riseMin
+                val obsFactor: Double? = if (satFactor != null || obs == null || nowC == null || eveningSwitch || beforeRise) null else {
                     var wc = 0.0; var ww = 0.0
                     for (i in (Math.floor(nowC).toInt() + 1) until minOf(d0.end, forecast.hours.size)) {
                         val h = forecast.hours[i]
