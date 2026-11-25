@@ -24,7 +24,9 @@ class MixSeries(
     /** Anteil von Solar und von allen Erneuerbaren am aktuellen Strombedarf (%), mit Zeitpunkt in Sekunden. */
     val solarShare: Double? = null, val renShare: Double? = null, val shareT: Long = 0L,
     /** Ab diesem Index sind die Werte vorläufig (Solar/Wind aus Prognose, Rest fortgeschrieben); -1 = alles gemessen. */
-    val estFrom: Int = -1
+    val estFrom: Int = -1,
+    /** Quelle von Import/Export: "physikalisch" (cbpf), "Handel" (cbet, Rückfall) oder "" (nur Gesamtzeile aus public_power). */
+    val tradeSrc: String = ""
 )
 
 enum class WeatherKind { Sun, SunCloud, Cloud, Rain, Snow, Hail, Thunder, Storm }
@@ -287,7 +289,7 @@ object Extras {
      * Nettostromerzeugung je Gruppe (MW) plus Import/Export (MW, beides positiv). Auf höchstens [maxPoints] Zeitpunkte
      * gemittelt. Schneidet hinten alles ab, wofür noch keine Erzeugungswerte vorliegen.
      */
-    fun parseMixSeries(json: String, maxPoints: Int, cbet: java.util.TreeMap<Long, DoubleArray>? = null): MixSeries? {
+    fun parseMixSeries(json: String, maxPoints: Int, cbet: java.util.TreeMap<Long, DoubleArray>? = null, tradeSrc: String = ""): MixSeries? {
         val o = JSONObject(json)
         val t = o.getJSONArray("unix_seconds")
         val types = o.getJSONArray("production_types")
@@ -410,7 +412,7 @@ object Extras {
                 shareT = t.getLong(li)
             }
         }
-        return MixSeries(times, out, haveTrade || cbet != null, solarShare, renShare, shareT)
+        return MixSeries(times, out, haveTrade || cbet != null, solarShare, renShare, shareT, -1, tradeSrc)
     }
 
     /** Grenzüberschreitender Handel je Land (GW), als MW: je Zeitpunkt [Summe der Einfuhren, Summe der Ausfuhren]. */
@@ -541,7 +543,7 @@ object Extras {
             if (ss != null) sShare = ss
             sT = t2[lastI]
         }
-        return MixSeries(t2, v2, s.hasTrade, sShare, rShare, sT, n)
+        return MixSeries(t2, v2, s.hasTrade, sShare, rShare, sT, n, s.tradeSrc)
     }
 
     /** Ergänzt die Tagesreihe um vorläufige Punkte bis jetzt (Prognosen); dauert länger und kommt deshalb nach der Grundansicht. */
@@ -563,16 +565,19 @@ object Extras {
             val base = "https://api.energy-charts.info"
             val pj = ecGet("$base/public_power?country=de&start=$from&end=$to")
             // Physikalische Flüsse (cbpf) entsprechen der Bilanz; der Handelssaldo (cbet) weicht je Grenze deutlich ab und dient nur als Rückfall
+            var src = "physikalisch"
             val trade = try {
                 cbetMap(ecGet("$base/cbpf?country=de&start=$from&end=$to")).takeIf { it.isNotEmpty() }
             } catch (e: Exception) {
                 null
             } ?: try {
+                src = "Handel (Rückfall)"
                 cbetMap(ecGet("$base/cbet?country=de&start=$from&end=$to"))
             } catch (e: Exception) {
+                src = ""
                 null
             }
-            return parseMixSeries(pj, max, trade)
+            return parseMixSeries(pj, max, trade, if (trade != null && trade.isNotEmpty()) src else "")
         }
         var s = when (range) {
             0 -> fetch(today, today, 96) ?: fetch(today.minusDays(1), today.minusDays(1), 96)

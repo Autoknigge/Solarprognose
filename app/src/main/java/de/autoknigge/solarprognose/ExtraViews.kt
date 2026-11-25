@@ -541,6 +541,10 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF3A3A3A)))
             bar("Import", "Import", true)
             bar("Export", "Export", true)
+            Text(
+                "Quelle Import/Export: " + (series.tradeSrc.ifEmpty { "nur Saldo aus public_power" }) + (if (range == 1) " · Stundenmittel" else if (range == 2) " · Mittel je 2 Tage" else ""),
+                fontSize = 11.sp, color = if (series.tradeSrc.startsWith("Handel")) Color(0xFFF59E1B) else LocalMuted.current
+            )
             val net = (avg("Import") - avg("Export")) / 1000.0
             Text(
                 (if (net >= 0) "Netto-Import (Import-Export) " else "Netto-Export (Export-Import) ") + Calc.fmt2(Math.abs(net)) + " GW",
