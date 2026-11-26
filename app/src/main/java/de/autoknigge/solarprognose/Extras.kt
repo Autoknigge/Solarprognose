@@ -461,12 +461,12 @@ object Extras {
     private val fcCache = HashMap<String, Pair<Long, java.util.TreeMap<Long, Double>>>()
 
     /** Prognosereihe (MW) je Zeitstempel aus public_power_forecast; leer bei Fehlern. */
-    private fun forecastMap(type: String, day: LocalDate): java.util.TreeMap<Long, Double> {
-        val ck = "$type|$day"
+    private fun forecastMap(type: String, day: LocalDate, to: LocalDate = day): java.util.TreeMap<Long, Double> {
+        val ck = "$type|$day|$to"
         synchronized(fcCache) { fcCache[ck] }?.let { if (System.currentTimeMillis() - it.first < 25L * 60 * 1000) return it.second }
         val m = java.util.TreeMap<Long, Double>()
         try {
-            val o = JSONObject(ecGet("https://api.energy-charts.info/public_power_forecast?country=de&production_type=$type&forecast_type=current&start=$day&end=$day"))
+            val o = JSONObject(ecGet("https://api.energy-charts.info/public_power_forecast?country=de&production_type=$type&forecast_type=current&start=$day&end=$to"))
             val t = o.getJSONArray("unix_seconds")
             val d = o.optJSONArray("forecast_values") ?: o.optJSONArray("data") ?: return m
             for (i in 0 until minOf(t.length(), d.length())) if (!d.isNull(i)) m[t.getLong(i)] = d.getDouble(i)
@@ -495,9 +495,8 @@ object Extras {
 
     /** Hängt hinter den letzten Messwert bis jetzt vorläufige Punkte an: Solar und Wind aus der Prognose, alles andere fortgeschrieben. */
     private fun forecastMapDays(type: String, days: List<LocalDate>): java.util.TreeMap<Long, Double> {
-        val m = java.util.TreeMap<Long, Double>()
-        for (d in days) m.putAll(forecastMap(type, d))
-        return m
+        // Ein Aufruf über beide Tage (Energy-Charts begrenzt die Anfragen pro Minute)
+        return forecastMap(type, days.first(), days.last())
     }
 
     private fun extendToNow(s: MixSeries, days: List<LocalDate>): MixSeries {
@@ -512,10 +511,10 @@ object Extras {
         val hourNow = java.time.ZonedDateTime.now(berlin).hour
         val solarNow = s.v["Solar"]?.get(n - 1) ?: 0.0
         val solar = if (solarNow < 50.0 && (hourNow >= 17 || hourNow < 7)) java.util.TreeMap<Long, Double>() else forecastMapDays("solar", days)
-        val loadFc = java.util.TreeMap<Long, Double>()
+        val loadFc = forecastMapDays("load", days)
         val wind = java.util.TreeMap<Long, Double>()
         for (ty in listOf("wind_onshore", "wind_offshore")) for ((k, v) in forecastMapDays(ty, days)) wind[k] = (wind[k] ?: 0.0) + v
-        if (solar.isEmpty() && wind.isEmpty()) return s
+        if (solar.isEmpty() && wind.isEmpty() && loadFc.isEmpty()) return s
         fun at(m: java.util.TreeMap<Long, Double>, ts: Long): Double? {
             val e = m.floorEntry(ts) ?: return null
             return if (ts - e.key <= 3600L) e.value else null
@@ -527,6 +526,26 @@ object Extras {
             val fc = when (k) { "Solar" -> solar; "Wind" -> wind; "Last" -> loadFc; else -> null }
             if (fc != null && fc.isNotEmpty()) for (i in n until n + add) at(fc, t2[i])?.let { na[i] = it.coerceAtLeast(0.0) }
             v2[k] = na
+        }
+        // Bilanz für die vorläufigen Punkte neu rechnen (nur mit Last aus der Prognose): Kohle und Erdgas folgen dem Rest aus Last und
+        // Erneuerbaren, der gemessene Import/Export wird fortgeschrieben; ein Überschuss geht in den Export.
+        if (loadFc.isNotEmpty()) for (i in n until n + add) {
+            if (at(loadFc, t2[i]) == null) continue
+            fun a(k: String) = v2[k]!![i]
+            val load = a("Last")
+            if (load < 1000.0) continue
+            val ren = listOf("Solar", "Wind", "Biomasse", "Wasserkraft", "Pumpspeicher", "Batterie", "Sonstige").sumOf { a(it) }
+            val baseImp = (a("Import") - a("ImportBilanz")).coerceAtLeast(0.0)
+            val resid = load + a("PumpLaden") + a("BattLaden") - ren - (baseImp - a("Export"))
+            val conv = resid.coerceAtLeast(0.0)
+            val convOld = a("Kohle") + a("Erdgas")
+            if (convOld > 1.0) {
+                val f = conv / convOld
+                for (k in listOf("Kohle", "Erdgas", "Braunkohle", "Steinkohle")) v2[k]!![i] = a(k) * f
+            } else v2["Erdgas"]!![i] = conv
+            v2["Import"]!![i] = baseImp
+            v2["ImportBilanz"]!![i] = 0.0
+            if (resid < 0.0) v2["Export"]!![i] = a("Export") - resid
         }
         // Anteile am Verbrauch auf den vorläufigen Zeitpunkt umrechnen: Last aus Prognose, sonst vom letzten Messwert abgeleitet
         var sShare = s.solarShare
