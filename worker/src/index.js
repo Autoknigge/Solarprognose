@@ -203,6 +203,30 @@ async function ec(endpoint, url, ctx) {
   return cached(ctx, key, ttl, () => ecUpstream(`https://api.energy-charts.info/${endpoint}?${q.toString()}`));
 }
 
+// Vorübergehend: Statuscodes der Energy-Charts-Abrufe (keine Daten), zur Fehlersuche
+async function diag() {
+  const d = berlinDate(0);
+  const tests = ["public_power?country=de", "public_power_forecast?country=de&production_type=solar&forecast_type=current",
+    "public_power_forecast?country=de&production_type=wind_onshore&forecast_type=current",
+    "public_power_forecast?country=de&production_type=wind_offshore&forecast_type=current",
+    "public_power_forecast?country=de&production_type=load&forecast_type=current"];
+  const out = [];
+  for (const t of tests) {
+    const url = `https://api.energy-charts.info/${t}&start=${d}&end=${d}`;
+    try {
+      const r = await fetch(url, { headers: { "user-agent": "solarprognose-worker" } });
+      let info = "";
+      if (r.ok) {
+        const o = JSON.parse(await r.text());
+        const t2 = o.unix_seconds || [];
+        info = " Punkte=" + t2.length + " letzter=" + (t2.length ? new Date(t2[t2.length - 1] * 1000).toISOString() : "-") + " Felder=" + Object.keys(o).join(",");
+      } else info = " " + (await r.text()).slice(0, 120);
+      out.push(t.split("?")[0] + (t.match(/production_type=(\w+)/) || ["", ""])[1] + " -> " + r.status + info);
+    } catch (e) { out.push(t + " -> Fehler " + e); }
+  }
+  return new Response(out.join("\n"), { headers: { "content-type": "text/plain; charset=utf-8" } });
+}
+
 async function search(url, env, ctx) {
   const name = (url.searchParams.get("name") || "").trim();
   if (name.length < 2 || name.length > 60) return json({ error: "bad_name" }, 400);
@@ -215,6 +239,7 @@ async function search(url, env, ctx) {
 export default {
   async fetch(request, env, ctx) {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
+    if (new URL(request.url).pathname === "/diag") return diag();
     if (env.APP_TOKEN && request.headers.get("x-app-token") !== env.APP_TOKEN) {
       return json({ error: "unauthorized" }, 401);
     }
