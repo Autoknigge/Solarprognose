@@ -154,18 +154,19 @@ const EC_LIVE_TTL = 300; // Bereiche mit heutigem Tag: Daten kommen alle 15 Minu
 const EC_LONG_TTL = 3600; // lange Bereiche (Jahr) und reine Vergangenheit
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// Energy-Charts begrenzt auf wenige Abrufe pro Minute (je IP). Bei 429 wartet der Worker laut Retry-After (höchstens 15 s) und versucht es erneut.
+// Energy-Charts begrenzt die Abrufe (je IP, geteilt mit anderen Cloudflare-Nutzern): Bei 429 mehrmals mit wachsender Pause wiederholen (Gesamtdauer < 30 s, die App wartet 45 s).
 async function ecUpstream(url) {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const pauses = [2000, 4000, 8000, 12000];
+  for (let attempt = 0; attempt <= pauses.length; attempt++) {
     let r;
     try {
       r = await fetch(url, { headers: { "user-agent": "solarprognose-worker" } });
     } catch (e) {
       return { error: json({ error: "upstream_unreachable" }, 502) };
     }
-    if (r.status === 429 && attempt < 2) {
+    if (r.status === 429 && attempt < pauses.length) {
       const ra = Number(r.headers.get("retry-after"));
-      const wait = Number.isFinite(ra) && ra > 0 ? Math.min(ra, 15) * 1000 : 12000;
+      const wait = Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, pauses[attempt]) : pauses[attempt];
       await new Promise((res) => setTimeout(res, wait));
       continue;
     }
@@ -202,6 +203,7 @@ async function ec(endpoint, url, ctx) {
     q.set("production_type", t);
     q.set("forecast_type", "current");
     key += `/${t}`;
+    ttl = 1800; // Prognosereihen ändern sich höchstens stündlich
   }
   return cached(ctx, key, ttl, () => ecUpstream(`https://api.energy-charts.info/${endpoint}?${q.toString()}`));
 }
