@@ -441,10 +441,15 @@ object Extras {
             for (i in 0 until minOf(t.length(), d.length())) {
                 if (d.isNull(i)) continue
                 val v = d.getDouble(i) * 1000.0
-                val a = m.getOrPut(t.getLong(i)) { DoubleArray(2) }
+                val a = m.getOrPut(t.getLong(i)) { DoubleArray(3) }
                 if (v > 0) a[0] += v else a[1] += -v
+                a[2] += 1.0
             }
         }
+        // Die jüngsten Zeitpunkte sind oft unvollständig (erst einzelne Länder haben gemeldet, Summe viel zu klein): solche Punkte verwerfen,
+        // die Reihe fällt dann auf den letzten vollständigen Wert zurück
+        val maxCnt = m.values.maxOfOrNull { it[2] } ?: 0.0
+        m.values.removeAll { it[2] < maxCnt * 0.75 }
         return m
     }
 
