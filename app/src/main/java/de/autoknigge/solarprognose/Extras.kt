@@ -299,6 +299,7 @@ object Extras {
         val raw = keys.associateWith { DoubleArray(n) }
         var last = -1
         var haveTrade = false
+        var carried = false
         var loadArr: org.json.JSONArray? = null
         var rslArr: org.json.JSONArray? = null
         for (k in 0 until types.length()) {
@@ -356,12 +357,25 @@ object Extras {
                 dot += (raw["Import"]!![i] - raw["Export"]!![i]) * (en.value[0] - en.value[1])
             }
             val swap = dot < 0.0
+            // Die Flussdaten kommen später als die Erzeugung: für die jüngsten Punkte ohne Flusswert den letzten bekannten (bis 4 h) fortschreiben,
+            // statt die Gesamtzeile aus public_power (dort oft 0) zu nehmen
+            var lastImp = 0.0
+            var lastExp = 0.0
+            var lastTs = -1L
             for (i in 0..last) {
                 val ts = t.getLong(i)
-                val en = cbet.floorEntry(ts) ?: continue
-                if (ts - en.key > 3600L) continue
-                raw["Import"]!![i] = if (swap) en.value[1] else en.value[0]
-                raw["Export"]!![i] = if (swap) en.value[0] else en.value[1]
+                val en = cbet.floorEntry(ts)
+                if (en != null && ts - en.key <= 3600L) {
+                    lastImp = if (swap) en.value[1] else en.value[0]
+                    lastExp = if (swap) en.value[0] else en.value[1]
+                    lastTs = ts
+                    raw["Import"]!![i] = lastImp
+                    raw["Export"]!![i] = lastExp
+                } else if (lastTs >= 0 && ts - lastTs <= 4 * 3600L) {
+                    raw["Import"]!![i] = lastImp
+                    raw["Export"]!![i] = lastExp
+                    carried = true
+                }
             }
             haveTrade = true
         }
@@ -412,7 +426,8 @@ object Extras {
                 shareT = t.getLong(li)
             }
         }
-        return MixSeries(times, out, haveTrade || cbet != null, solarShare, renShare, shareT, -1, tradeSrc)
+        return MixSeries(times, out, haveTrade || cbet != null, solarShare, renShare, shareT, -1,
+            if (carried && tradeSrc.isNotEmpty()) "$tradeSrc, jüngste Werte fortgeschrieben" else tradeSrc)
     }
 
     /** Grenzüberschreitender Handel je Land (GW), als MW: je Zeitpunkt [Summe der Einfuhren, Summe der Ausfuhren]. */
