@@ -481,7 +481,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         }
                         cum += e
                     }
-                    if (res != null) "Erste volle kWh um $res Uhr" else "Heute keine volle kWh"
+                    if (res != null) "1. volle kWh um $res Uhr" else "Heute keine volle kWh"
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile(if (eveningSwitch) "Morgen" else "Heute", Calc.fmt1(if (eveningSwitch) adjDay(t0).kwh else t0.kwh * fk), "kWh", if (eveningSwitch) (spread(t0)?.let { it + "\n" } ?: "") + "Spitze " + Calc.fmt0(t0.peak) + " W gegen " + t0.peakHour + " Uhr" else if (rest != null) "noch " + Calc.fmt1(rest) + " kWh bis Sonnenuntergang" else "ganzer Tag",

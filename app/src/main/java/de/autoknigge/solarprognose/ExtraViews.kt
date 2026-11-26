@@ -451,7 +451,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
     }
     SectionCard(
         title = "Strommix Deutschland",
-        trailing = co2?.let { c -> { Text("≈ " + Calc.fmt0(c) + " g CO₂/kWh", fontSize = 11.sp, color = Color(0xFF9A9A9A)) } },
+        trailing = co2?.let { c -> { Text("≈ " + Calc.fmt0(c) + " g CO₂/kWh*", fontSize = 11.sp, color = Color(0xFF9A9A9A)) } },
         bg = Color.Black, borderColor = Color(0xFF3A3A3A), inkColor = Color(0xFFEDEDED), mutedColor = Color(0xFF9A9A9A), darken = 0f
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -543,7 +543,16 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                     }
                 }
                 Row(Modifier.weight(0.66f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Box(Modifier.weight(w).height(22.dp).background(colors[name] ?: Color.Gray))
+                    val zus = if (name == "Import") avg("ImportBilanz") else 0.0
+                    val tot = avg(name)
+                    if (zus > 1.0 && tot > 0.0) {
+                        // Rechnerisch ergänzter Teil des Imports (Bilanzlücke) gelb
+                        val fz = (zus / tot).toFloat().coerceIn(0.02f, 0.98f)
+                        Row(Modifier.weight(w).height(22.dp)) {
+                            Box(Modifier.weight(1f - fz).fillMaxHeight().background(colors[name] ?: Color.Gray))
+                            Box(Modifier.weight(fz).fillMaxHeight().background(Color(0xFFE3B341)))
+                        }
+                    } else Box(Modifier.weight(w).height(22.dp).background(colors[name] ?: Color.Gray))
                     Text(if (gwOnly) Calc.fmt2(avg(name) / 1000.0) + " GW" else Calc.fmt1(pct) + " % · " + Calc.fmt1(avg(name) / 1000.0) + " GW", fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.padding(start = 6.dp), maxLines = 1)
                     Box(Modifier.weight((1f - w).coerceAtLeast(0.01f)))
                 }
@@ -618,8 +627,8 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
             }
         }
         if (series.estFrom >= 0) Text("Vorläufig: ab " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(series.t[series.estFrom]).atZone(zone).hour, Instant.ofEpochSecond(series.t[series.estFrom]).atZone(zone).minute) + " Solar und Wind aus der Energy-Charts-Prognose, übrige Werte vom letzten Messwert fortgeschrieben.", fontSize = 10.5.sp, color = Color(0xFFE3B341), lineHeight = 14.sp)
-        Text("CO₂: Schätzung aus dem Erzeugungsmix mit festen Durchschnittswerten je Energieträger, ohne Import. Keine amtliche Messung.", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
-        Text("Nettostromerzeugung der öffentlichen Stromversorgung ohne Eigenerzeugung der Industrie, Anteile an der Erzeugung. Import und Export: physikalische Flüsse über die Grenzen. Der Import ist eine saldierte Zahl: Fehlt in den Quelldaten Strom zur Deckung der Last, wird die Lücke als Import ergänzt (gelb ausgewiesen). Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
+        Text("*CO₂: Schätzung aus dem Erzeugungsmix mit festen Durchschnittswerten je Energieträger, ohne Import. Keine amtliche Messung.", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
+        Text("Nettostromerzeugung: Anteile ohne Eigenerzeugung der Industrie. Der Import ist eine saldierte Zahl: Fehlt in den Quelldaten Strom zur Deckung der Last, wird die Lücke als Import vermutet (gelb ausgewiesen). Quelle: Fraunhofer ISE, energy-charts.info (CC BY 4.0)", fontSize = 10.5.sp, color = LocalMuted.current, lineHeight = 14.sp)
     }
 }
 
