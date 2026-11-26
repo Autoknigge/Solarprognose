@@ -20,6 +20,22 @@ jobs:
       - name: Tests
         run: node worker/test/test.mjs
 
+      # Dauerhaften Speicher (KV) anlegen, falls noch nicht vorhanden, und seine ID in wrangler.toml eintragen
+      - name: KV-Speicher bereitstellen
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces"
+          id=$(curl -sS -H "Authorization: Bearer $CF_TOKEN" "$api?per_page=100" | jq -r '.result[]? | select(.title=="solarprognose-cache") | .id' | head -n1)
+          if [ -z "$id" ]; then
+            resp=$(curl -sS -X POST -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" --data '{"title":"solarprognose-cache"}' "$api")
+            id=$(echo "$resp" | jq -r '.result.id // empty')
+            if [ -z "$id" ]; then echo "KV-Speicher konnte nicht angelegt werden:"; echo "$resp" | jq -r '.errors'; exit 1; fi
+          fi
+          sed -i "s/KV_ID_PLATZHALTER/$id/" worker/wrangler.toml
+          echo "KV-Speicher bereit"
+
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

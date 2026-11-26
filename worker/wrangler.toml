@@ -7,3 +7,12 @@ compatibility_date = "2025-06-01"
 routes = [
   { pattern = "solar-api.autoknigge.de", custom_domain = true }
 ]
+
+# Hintergrundlauf: hält die Energy-Charts-Reihen frisch, damit die App sofort Daten bekommt.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Dauerhafter Speicher. Die ID trägt der Workflow beim Veröffentlichen ein (legt den Speicher bei Bedarf an).
+[[kv_namespaces]]
+binding = "CACHE"
+id = "KV_ID_PLATZHALTER"

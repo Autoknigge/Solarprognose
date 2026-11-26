@@ -150,4 +150,33 @@ for (const q of [
   assert.ok(r.status === 400 || r.status === 404, q + " -> " + r.status);
 }
 
+// 12. KV-Speicher und Hintergrundlauf
+const kvStore = new Map();
+const kv = {
+  async getWithMetadata(k) { const e = kvStore.get(k); return e ? { value: e.v, metadata: e.m } : { value: null, metadata: null }; },
+  async put(k, v, o) { kvStore.set(k, { v, m: o.metadata }); },
+};
+const envKv = { ...env, CACHE: kv, WARM_GAP_MS: "0" };
+let nK = upstreamCalls.length;
+await worker.scheduled({}, envKv, ctx);
+await Promise.all(pending.splice(0));
+const warmCalls = upstreamCalls.slice(nK);
+assert.ok(warmCalls.some((u) => u.includes("public_power?")), "Hintergrundlauf holt den Strommix");
+assert.ok(warmCalls.some((u) => u.includes("cbpf")), "… die Flüsse");
+for (const t of ["solar", "wind_onshore", "wind_offshore", "load"]) assert.ok(warmCalls.some((u) => u.includes("production_type=" + t)), "… Prognose " + t);
+assert.ok(warmCalls.some((u) => u.includes("ren_share_forecast")));
+// App-Abruf danach: aus dem KV, ohne neuen Abruf beim Anbieter
+const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(new Date());
+nK = upstreamCalls.length;
+r = await call(`/ec/public_power_forecast?production_type=load&start=${today}&end=${today}&forecast_type=day-ahead`, { "x-app-token": "geheim" }, envKv);
+assert.equal(r.status, 200);
+assert.equal(upstreamCalls.length, nK, "Antwort kommt aus dem dauerhaften Speicher");
+// zweiter Lauf sofort danach: gesperrt, keine neuen Abrufe
+nK = upstreamCalls.length;
+await worker.scheduled({}, envKv, ctx);
+await Promise.all(pending.splice(0));
+assert.equal(upstreamCalls.length, nK, "Sperre verhindert Doppellauf");
+// Ohne KV bleibt alles wie vorher
+await worker.scheduled({}, env, ctx);
+
 console.log("Alle Worker-Tests bestanden");
