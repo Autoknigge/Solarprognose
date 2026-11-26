@@ -171,11 +171,11 @@ nK = upstreamCalls.length;
 r = await call(`/ec/public_power_forecast?production_type=load&start=${today}&end=${today}&forecast_type=day-ahead`, { "x-app-token": "geheim" }, envKv);
 assert.equal(r.status, 200);
 assert.equal(upstreamCalls.length, nK, "Antwort kommt aus dem dauerhaften Speicher");
-// zweiter Lauf sofort danach: gesperrt, keine neuen Abrufe
+// zweiter Lauf sofort danach: alles frisch, keine neuen Abrufe
 nK = upstreamCalls.length;
 await worker.scheduled({}, envKv, ctx);
 await Promise.all(pending.splice(0));
-assert.equal(upstreamCalls.length, nK, "Sperre verhindert Doppellauf");
+assert.equal(upstreamCalls.length, nK, "frische Reihen werden nicht neu geholt");
 // Ohne KV bleibt alles wie vorher
 await worker.scheduled({}, env, ctx);
 

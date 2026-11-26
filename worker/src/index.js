@@ -235,7 +235,7 @@ async function ec(endpoint, url, env, ctx) {
   if (plan.error) return plan.error;
   // Frische je Art: Live-Reihen werden im Hintergrund alle 5 Minuten erneuert, Prognosen alle 30
   const kv = await kvRead(env, plan.key);
-  const window = plan.live ? 600 : plan.ttl;
+  const window = plan.live ? 900 : plan.ttl;
   if (kv && Date.now() - kv.t < window * 1000) {
     return new Response(kv.text, { status: 200, headers: { ...JSON_HEADERS, "cache-control": `public, max-age=${Math.min(plan.ttl, 300)}` } });
   }
@@ -254,9 +254,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function warm(env) {
   if (!env.CACHE) return;
   const gap = env.WARM_GAP_MS !== undefined ? Number(env.WARM_GAP_MS) : 20000;
-  const lock = await kvRead(env, "https://cache.invalid/lock");
-  if (lock && Date.now() - lock.t < 240000) return;
-  await kvWrite(env, "https://cache.invalid/lock", "1");
+  // KV erlaubt im kostenlosen Tarif nur 1000 Schreibvorgänge am Tag: Live-Reihen höchstens alle 10 Minuten, Prognosen alle 30, keine Sperr-Einträge
   const today = berlinDate(0);
   const yesterday = berlinDate(-1);
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", hour12: false }).format(new Date()));
@@ -268,8 +266,8 @@ async function warm(env) {
     return { ep, u };
   };
   for (const [s, e] of days) {
-    jobs.push({ ...mk("public_power", { start: s, end: e }), minAge: 240 });
-    jobs.push({ ...mk("cbpf", { start: s, end: e }), minAge: 240 });
+    jobs.push({ ...mk("public_power", { start: s, end: e }), minAge: 540 });
+    jobs.push({ ...mk("cbpf", { start: s, end: e }), minAge: 540 });
   }
   for (const t of ["solar", "wind_onshore", "wind_offshore", "load"]) {
     for (const [s, e] of days.slice(-1)) jobs.push({ ...mk("public_power_forecast", { start: s, end: e, production_type: t }), minAge: 1500 });
