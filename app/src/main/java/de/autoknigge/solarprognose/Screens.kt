@@ -405,9 +405,23 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                 }
                 // Gedämpft (Exponent 0,75): Satellit und DWD unterschätzen bei dichter Decke das tatsächliche Licht
-                val corr = Math.pow(satFactor ?: obsFactor ?: 1.0, 0.75)
-                // Mit Satellitenmessung: vergangener Teil des Tages aus der Messung, Rest nach gewähltem Modell mit demselben gedämpften Faktor. Sonst Tageswert des Modells (ggf. nach DWD-Bewölkung).
-                val satIcon = if (satFactor != null && dSmIcon > 0.0) Math.pow(dSs / dSmIcon, 0.75) else null
+                val corrDay = Math.pow(satFactor ?: obsFactor ?: 1.0, 0.75)
+                // Mit Satellitenmessung: vergangener Teil des Tages aus der Messung. Für den Rest zählt nur die Abweichung der letzten ein bis zwei Stunden:
+                // Klart es auf, fällt die Korrektur weg; ziehen Wolken auf, greift sie sofort. Ohne Satellitendaten: Tageswert des Modells (ggf. nach DWD-Bewölkung).
+                val haveSat = satMap != null && nowC != null && !eveningSwitch && dCnt >= 1
+                val recentFactor: Double? = if (!haveSat) null else {
+                    var sm2 = 0.0; var ss2 = 0.0; var cnt2 = 0
+                    val last = Math.floor(nowC!!).toInt().coerceAtMost(forecast.hours.size - 1)
+                    for (i in maxOf(0, last - 1)..last) {
+                        val h = forecast.hours[i]
+                        if (h.date != d0.date || h.gti < 40.0) continue
+                        val sv = satMap!![h.time] ?: continue
+                        sm2 += h.gti * modelFk; ss2 += sv; cnt2++
+                    }
+                    if (cnt2 >= 1 && sm2 >= 60.0 && (ss2 / sm2 < 0.85 || ss2 / sm2 > 1.15)) (ss2 / sm2).coerceIn(0.05, 1.6) else null
+                }
+                val corr = if (haveSat) Math.pow(recentFactor ?: 1.0, 0.75) else corrDay
+                val satIcon = if (haveSat && dSmIcon > 0.0) (if (satFactor != null) Math.pow(dSs / dSmIcon, 0.75) else 1.0) else null
                 val restSel = restModel?.let { it * modelFk * corr }
                 val todayTotal = if (satIcon != null && restSel != null) (d0.kwh - (restModel ?: 0.0)) * satIcon + restSel else d0.kwh * modelFk * corr
                 val fk = if (d0.kwh > 0.0) todayTotal / d0.kwh else 1.0
@@ -427,7 +441,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 // Tageswerte für Diagramme und Summen: gewähltes Modell
                 fun adjDay(d: Day): Day {
                     val sun = modelsMap?.get("$selModel#sun")?.get(d.date)
-                    val sunScale = if (d.date == d0.date && !eveningSwitch) corr else if (d.date < d0.date || d.date == d0.date) (satDay(d) ?: 1.0) else 1.0
+                    val sunScale = if (d.date == d0.date && !eveningSwitch) (if (haveSat && d0.kwh * modelFk > 0.0) todayTotal / (d0.kwh * modelFk) else corr) else if (d.date < d0.date || d.date == d0.date) (satDay(d) ?: 1.0) else 1.0
                     val d2 = if (sun != null) d.copy(sunH = sun * sunScale) else d.copy(sunH = d.sunH?.let { it * sunScale })
                     val done = d.date < d0.date || (d.date == d0.date && eveningSwitch)
                     val sd = if (done) satDay(d) else null
@@ -439,7 +453,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                 val best = dayListA.maxByOrNull { it.kwh } ?: adjDay(t0)
                 val diagText = "Diagnose: DWD-Bewölkung " + (obs?.let { Calc.fmt0(it.pct) + " %" + (it.station?.let { st -> " (" + st + (it.km?.let { k -> ", " + Calc.fmt0(k) + " km" } ?: "") + ")" } ?: "") } ?: "keine Daten") +
                     " · Satellit: " + (if (satMap == null) "keine Daten" else if (dCnt == 0) "noch keine vergleichbare Stunde" else dCnt.toString() + " Std., Messung " + Calc.fmt0(dSs / dCnt) + " gegen Modell " + Calc.fmt0(dSm / dCnt) + " W/m²") +
-                    " · Korrektur " + Calc.fmt2(corr)
+                    " · Korrektur Resttag " + Calc.fmt2(corr)
                 val rest = if (satIcon != null) restSel else restModel?.let { it * fk }
 
                 val uvNow = nowC?.let { c ->
@@ -494,7 +508,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     Tile(dayList.size.toString() + "-Tage-Maximum am", Calc.weekday(best.date) + " " + Calc.dm(best.date), null, Calc.fmt1(best.kwh) + " kWh erwartet", Modifier.weight(1f).fillMaxHeight(), bg = Color(0xFFEE9F27), mutedColor = Color.Black, inkColor = Color.Black)
                 }
 
-                val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0)?.times(satIcon ?: fk) }
+                val nowKw = nowC?.let { forecast.hours.getOrNull(Math.floor(it).toInt() + 1)?.power?.div(1000.0)?.times(if (satIcon != null) modelFk * corr else fk) }
                 if (eveningSwitch && d1 != null) TomorrowCard(adjDay(d1).kwh, adjDay(d1).sunH, run {
                     var cum = 0.0
                     var res: String? = null
