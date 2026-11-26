@@ -527,8 +527,7 @@ object Extras {
             if (fc != null && fc.isNotEmpty()) for (i in n until n + add) at(fc, t2[i])?.let { na[i] = it.coerceAtLeast(0.0) }
             v2[k] = na
         }
-        // Bilanz für die vorläufigen Punkte neu rechnen (nur mit Last aus der Prognose): Kohle und Erdgas folgen dem Rest aus Last und
-        // Erneuerbaren, der gemessene Import/Export wird fortgeschrieben; ein Überschuss geht in den Export.
+        // Bilanz für die vorläufigen Punkte neu rechnen (nur mit Last aus der Prognose).
         if (loadFc.isNotEmpty()) for (i in n until n + add) {
             if (at(loadFc, t2[i]) == null) continue
             fun a(k: String) = v2[k]!![i]
@@ -536,16 +535,16 @@ object Extras {
             if (load < 1000.0) continue
             val ren = listOf("Solar", "Wind", "Biomasse", "Wasserkraft", "Pumpspeicher", "Batterie", "Sonstige").sumOf { a(it) }
             val baseImp = (a("Import") - a("ImportBilanz")).coerceAtLeast(0.0)
-            val resid = load + a("PumpLaden") + a("BattLaden") - ren - (baseImp - a("Export"))
-            val conv = resid.coerceAtLeast(0.0)
-            val convOld = a("Kohle") + a("Erdgas")
-            if (convOld > 1.0) {
-                val f = conv / convOld
-                for (k in listOf("Kohle", "Erdgas", "Braunkohle", "Steinkohle")) v2[k]!![i] = a(k) * f
-            } else v2["Erdgas"]!![i] = conv
-            v2["Import"]!![i] = baseImp
-            v2["ImportBilanz"]!![i] = 0.0
-            if (resid < 0.0) v2["Export"]!![i] = a("Export") - resid
+            // Kohle und Erdgas bleiben fortgeschrieben; was zur Last fehlt, kommt als Import aus dem Ausland, ein Überschuss geht in den Export
+            val gap = load + a("PumpLaden") + a("BattLaden") - ren - a("Kohle") - a("Erdgas") - (baseImp - a("Export"))
+            if (gap > 0.0) {
+                v2["Import"]!![i] = baseImp + gap
+                v2["ImportBilanz"]!![i] = gap
+            } else {
+                v2["Import"]!![i] = baseImp
+                v2["ImportBilanz"]!![i] = 0.0
+                v2["Export"]!![i] = a("Export") - gap
+            }
         }
         // Anteile am Verbrauch auf den vorläufigen Zeitpunkt umrechnen: Last aus Prognose, sonst vom letzten Messwert abgeleitet
         var sShare = s.solarShare
