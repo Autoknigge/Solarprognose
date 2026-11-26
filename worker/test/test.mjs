@@ -126,4 +126,28 @@ assert.equal(upstreamCalls.length, n1 + 1, "Preise kommen aus dem Zwischenspeich
 r = await call("/prices?bzn=XX%26evil");
 assert.equal(r.status, 400);
 
+// 11. Strommix (Energy-Charts): nur erlaubte Abrufe, feste Parameter, Zwischenspeicher
+n1 = upstreamCalls.length;
+r = await call("/ec/public_power?start=2026-11-01&end=2026-11-26&country=fr&evil=1");
+assert.equal(r.status, 200);
+assert.equal(upstreamCalls[n1], "https://api.energy-charts.info/public_power?country=de&start=2026-11-01&end=2026-11-26");
+r = await call("/ec/public_power?start=2026-11-01&end=2026-11-26");
+assert.equal(upstreamCalls.length, n1 + 1, "Strommix kommt aus dem Zwischenspeicher");
+r = await call("/ec/public_power_forecast?production_type=wind_onshore&start=2026-11-26&end=2026-11-26&forecast_type=day-ahead");
+assert.equal(upstreamCalls.at(-1), "https://api.energy-charts.info/public_power_forecast?country=de&start=2026-11-26&end=2026-11-26&production_type=wind_onshore&forecast_type=current");
+r = await call("/ec/ren_share_forecast");
+assert.equal(upstreamCalls.at(-1), "https://api.energy-charts.info/ren_share_forecast?country=de");
+for (const q of [
+  "/ec/price?start=2026-11-01&end=2026-11-02",
+  "/ec/public_power",
+  "/ec/public_power?start=2026-11-01",
+  "/ec/public_power?start=2026-11-30&end=2026-11-01",
+  "/ec/public_power?start=2020-01-01&end=2026-11-01",
+  "/ec/public_power_forecast?production_type=gas&start=2026-11-26&end=2026-11-26",
+  "/ec/public_power_forecast?start=2026-11-26&end=2026-11-26",
+]) {
+  r = await call(q);
+  assert.ok(r.status === 400 || r.status === 404, q + " -> " + r.status);
+}
+
 console.log("Alle Worker-Tests bestanden");

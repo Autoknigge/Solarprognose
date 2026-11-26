@@ -459,6 +459,18 @@ object Extras {
     private var ecLast = System.currentTimeMillis()
 
     private fun ecGet(url: String): String {
+        // Mit eigenem Worker: gemeinsamer Zwischenspeicher, kein Anfragelimit auf dem Handy. Fehlt die Route oder schlägt es fehl, direkt abrufen.
+        val ecBase = "https://api.energy-charts.info/"
+        if (Api.hasProxy && url.startsWith(ecBase)) {
+            try {
+                return Api.get(Api.proxy + "/ec/" + url.removePrefix(ecBase), true)
+            } catch (e: Exception) {
+            }
+        }
+        return ecGetDirect(url)
+    }
+
+    private fun ecGetDirect(url: String): String {
         var wait = 0L
         synchronized(ecLock) {
             val now = System.currentTimeMillis()

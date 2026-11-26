@@ -146,6 +146,63 @@ async function prices(url, ctx) {
   );
 }
 
+// Strommix (Energy-Charts, Fraunhofer ISE): nur erlaubte Abrufe, gemeinsamer Zwischenspeicher für alle Nutzer.
+// Energy-Charts begrenzt die Anfragen je IP-Adresse; so ruft nur der Worker ab, höchstens alle paar Minuten je Reihe.
+const EC_ENDPOINTS = new Set(["public_power", "cbpf", "cbet", "public_power_forecast", "ren_share_forecast"]);
+const EC_TYPES = new Set(["solar", "wind_onshore", "wind_offshore", "load"]);
+const EC_LIVE_TTL = 300; // Bereiche mit heutigem Tag: Daten kommen alle 15 Minuten
+const EC_LONG_TTL = 3600; // lange Bereiche (Jahr) und reine Vergangenheit
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+async function ecUpstream(url) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let r;
+    try {
+      r = await fetch(url, { headers: { "user-agent": "solarprognose-worker" } });
+    } catch (e) {
+      return { error: json({ error: "upstream_unreachable" }, 502) };
+    }
+    if (r.status === 429 && attempt === 0) {
+      await new Promise((res) => setTimeout(res, 1500));
+      continue;
+    }
+    if (!r.ok) return { error: json({ error: "upstream_error", status: r.status }, 502) };
+    return { text: await r.text() };
+  }
+  return { error: json({ error: "upstream_error", status: 429 }, 502) };
+}
+
+async function ec(endpoint, url, ctx) {
+  if (!EC_ENDPOINTS.has(endpoint)) return json({ error: "not_found" }, 404);
+  const q = new URLSearchParams();
+  q.set("country", "de");
+  let ttl = 900;
+  let key = `https://cache.invalid/ec/${endpoint}`;
+  if (endpoint !== "ren_share_forecast") {
+    const start = url.searchParams.get("start") || "";
+    const end = url.searchParams.get("end") || "";
+    if (!DATE_RE.test(start) || !DATE_RE.test(end)) return json({ error: "bad_dates" }, 400);
+    const ds = Date.parse(start + "T00:00:00Z");
+    const de = Date.parse(end + "T00:00:00Z");
+    const days = (de - ds) / 86400000;
+    if (!Number.isFinite(days) || days < 0 || days > 400 || ds < Date.parse("2015-01-01T00:00:00Z")) {
+      return json({ error: "bad_dates" }, 400);
+    }
+    q.set("start", start);
+    q.set("end", end);
+    key += `/${start}/${end}`;
+    ttl = days > 31 || end < berlinDate(0) ? EC_LONG_TTL : EC_LIVE_TTL;
+  }
+  if (endpoint === "public_power_forecast") {
+    const t = url.searchParams.get("production_type") || "";
+    if (!EC_TYPES.has(t)) return json({ error: "bad_type" }, 400);
+    q.set("production_type", t);
+    q.set("forecast_type", "current");
+    key += `/${t}`;
+  }
+  return cached(ctx, key, ttl, () => ecUpstream(`https://api.energy-charts.info/${endpoint}?${q.toString()}`));
+}
+
 async function search(url, env, ctx) {
   const name = (url.searchParams.get("name") || "").trim();
   if (name.length < 2 || name.length > 60) return json({ error: "bad_name" }, 400);
@@ -167,6 +224,7 @@ export default {
     if (url.pathname === "/search") return search(url, env, ctx);
     if (url.pathname === "/yearly") return yearly(url, ctx);
     if (url.pathname === "/prices") return prices(url, ctx);
+    if (url.pathname.startsWith("/ec/")) return ec(url.pathname.slice(4), url, ctx);
     if (url.pathname === "/") return json({ ok: true, service: "solarprognose-api" });
     return json({ error: "not_found" }, 404);
   },
