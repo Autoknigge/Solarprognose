@@ -485,13 +485,19 @@ object Extras {
         val ck = "$type|$day|$to"
         synchronized(fcCache) { fcCache[ck] }?.let { if (System.currentTimeMillis() - it.first < 25L * 60 * 1000) return it.second }
         val m = java.util.TreeMap<Long, Double>()
-        try {
-            val o = JSONObject(ecGet("https://api.energy-charts.info/public_power_forecast?country=de&production_type=$type&forecast_type=current&start=$day&end=$to"))
-            val t = o.getJSONArray("unix_seconds")
-            val d = o.optJSONArray("forecast_values") ?: o.optJSONArray("data") ?: return m
-            for (i in 0 until minOf(t.length(), d.length())) if (!d.isNull(i)) m[t.getLong(i)] = d.getDouble(i)
-            if (m.isNotEmpty()) synchronized(fcCache) { fcCache[ck] = System.currentTimeMillis() to m }
-        } catch (e: Exception) {
+        // bis zu zwei Versuche: ein einzelner Fehlschlag (z. B. Anfragelimit) darf nicht still eine halbe Reihe ergeben
+        for (attempt in 0..1) {
+            try {
+                val o = JSONObject(ecGet("https://api.energy-charts.info/public_power_forecast?country=de&production_type=$type&forecast_type=current&start=$day&end=$to"))
+                val t = o.getJSONArray("unix_seconds")
+                val d = o.optJSONArray("forecast_values") ?: o.optJSONArray("data") ?: break
+                for (i in 0 until minOf(t.length(), d.length())) if (!d.isNull(i)) m[t.getLong(i)] = d.getDouble(i)
+                if (m.isNotEmpty()) {
+                    synchronized(fcCache) { fcCache[ck] = System.currentTimeMillis() to m }
+                    break
+                }
+            } catch (e: Exception) {
+            }
         }
         return m
     }
@@ -532,9 +538,12 @@ object Extras {
         val solarNow = s.v["Solar"]?.get(n - 1) ?: 0.0
         val solar = if (solarNow < 50.0 && (hourNow >= 17 || hourNow < 7)) java.util.TreeMap<Long, Double>() else forecastMapDays("solar", days)
         val loadFc = forecastMapDays("load", days)
+        // Wind nur, wenn beide Teile (Land und See) vorliegen; sonst fehlt ein großer Teil und die Reihe wäre falsch
         val wind = java.util.TreeMap<Long, Double>()
-        for (ty in listOf("wind_onshore", "wind_offshore")) for ((k, v) in forecastMapDays(ty, days)) wind[k] = (wind[k] ?: 0.0) + v
-        if (solar.isEmpty() && wind.isEmpty() && loadFc.isEmpty()) return s
+        val windParts = listOf("wind_onshore", "wind_offshore").map { forecastMapDays(it, days) }
+        if (windParts.all { it.isNotEmpty() }) for (p in windParts) for ((k, v) in p) wind[k] = (wind[k] ?: 0.0) + v
+        // Prognosen nur gemeinsam verwenden: Wind/Solar ohne die passende Last würden zu den fortgeschriebenen Werten nicht passen
+        if (wind.isEmpty() || loadFc.isEmpty()) return s
         fun at(m: java.util.TreeMap<Long, Double>, ts: Long): Double? {
             val e = m.floorEntry(ts) ?: return null
             return if (ts - e.key <= 3600L) e.value else null
