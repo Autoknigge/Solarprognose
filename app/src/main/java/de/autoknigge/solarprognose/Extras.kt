@@ -455,14 +455,14 @@ object Extras {
 
     // Energy-Charts erlaubt nur ca. 2 Anfragen pro Minute (Burst 4): einfacher Token-Bucket, damit keine Antworten mit HTTP 429 verloren gehen
     private val ecLock = Any()
-    private var ecTokens = 4.0
+    private var ecTokens = 2.0
     private var ecLast = System.currentTimeMillis()
 
     private fun ecGet(url: String): String {
         var wait = 0L
         synchronized(ecLock) {
             val now = System.currentTimeMillis()
-            ecTokens = minOf(4.0, ecTokens + (now - ecLast) / 30000.0)
+            ecTokens = minOf(2.0, ecTokens + (now - ecLast) / 30000.0)
             ecLast = now
             if (ecTokens < 1.0) wait = ((1.0 - ecTokens) * 30000.0).toLong()
             ecTokens -= 1.0
@@ -485,8 +485,9 @@ object Extras {
         val ck = "$type|$day|$to"
         synchronized(fcCache) { fcCache[ck] }?.let { if (System.currentTimeMillis() - it.first < 25L * 60 * 1000) return it.second }
         val m = java.util.TreeMap<Long, Double>()
-        // bis zu zwei Versuche: ein einzelner Fehlschlag (z. B. Anfragelimit) darf nicht still eine halbe Reihe ergeben
-        for (attempt in 0..1) {
+        // bis zu drei Versuche mit Pause: ein Fehlschlag (z. B. Anfragelimit) darf nicht still eine halbe Reihe ergeben
+        for (attempt in 0..2) {
+            if (attempt > 0) Thread.sleep(20000)
             try {
                 val o = JSONObject(ecGet("https://api.energy-charts.info/public_power_forecast?country=de&production_type=$type&forecast_type=current&start=$day&end=$to"))
                 val t = o.getJSONArray("unix_seconds")
