@@ -493,12 +493,12 @@ object Extras {
     private val fcCache = HashMap<String, Pair<Long, java.util.TreeMap<Long, Double>>>()
 
     /** Prognosereihe (MW) je Zeitstempel aus public_power_forecast; leer bei Fehlern. */
-    private fun forecastMap(type: String, day: LocalDate, to: LocalDate = day): java.util.TreeMap<Long, Double> {
+    private fun forecastMap(type: String, day: LocalDate, to: LocalDate = day, tries: Int = 3): java.util.TreeMap<Long, Double> {
         val ck = "$type|$day|$to"
         synchronized(fcCache) { fcCache[ck] }?.let { if (System.currentTimeMillis() - it.first < 25L * 60 * 1000) return it.second }
         val m = java.util.TreeMap<Long, Double>()
         // bis zu drei Versuche mit Pause: ein Fehlschlag (z. B. Anfragelimit) darf nicht still eine halbe Reihe ergeben
-        for (attempt in 0..2) {
+        for (attempt in 0 until tries) {
             if (attempt > 0) Thread.sleep(20000)
             try {
                 val o = JSONObject(ecGet("https://api.energy-charts.info/public_power_forecast?country=de&production_type=$type&forecast_type=current&start=$day&end=$to"))
@@ -535,7 +535,8 @@ object Extras {
     /** Hängt hinter den letzten Messwert bis jetzt vorläufige Punkte an: Solar und Wind aus der Prognose, alles andere fortgeschrieben. */
     private fun forecastMapDays(type: String, days: List<LocalDate>): java.util.TreeMap<Long, Double> {
         // Ein Aufruf über beide Tage (Energy-Charts begrenzt die Anfragen pro Minute)
-        return forecastMap(type, days.first(), days.last())
+        // Last-Prognose ist optional (ein Versuch): ohne sie wird die letzte Last fortgeschrieben und die Lücke steht im Import
+        return forecastMap(type, days.first(), days.last(), if (type == "load") 1 else 3)
     }
 
     private fun extendToNow(s: MixSeries, days: List<LocalDate>): MixSeries {
@@ -555,8 +556,8 @@ object Extras {
         val wind = java.util.TreeMap<Long, Double>()
         val windParts = listOf("wind_onshore", "wind_offshore").map { forecastMapDays(it, days) }
         if (windParts.all { it.isNotEmpty() }) for (p in windParts) for ((k, v) in p) wind[k] = (wind[k] ?: 0.0) + v
-        // Prognosen nur gemeinsam verwenden: Wind/Solar ohne die passende Last würden zu den fortgeschriebenen Werten nicht passen
-        if (wind.isEmpty() || loadFc.isEmpty()) return s
+        // Wind (beide Teile) ist Pflicht; die Last-Prognose ist optional, sonst bleibt die letzte Last und die Bilanz-Lücke geht in den Import
+        if (wind.isEmpty()) return s
         fun at(m: java.util.TreeMap<Long, Double>, ts: Long): Double? {
             val e = m.floorEntry(ts) ?: return null
             return if (ts - e.key <= 3600L) e.value else null
@@ -570,8 +571,7 @@ object Extras {
             v2[k] = na
         }
         // Bilanz für die vorläufigen Punkte neu rechnen (nur mit Last aus der Prognose).
-        if (loadFc.isNotEmpty()) for (i in n until n + add) {
-            if (at(loadFc, t2[i]) == null) continue
+        for (i in n until n + add) {
             fun a(k: String) = v2[k]!![i]
             val load = a("Last")
             if (load < 1000.0) continue
