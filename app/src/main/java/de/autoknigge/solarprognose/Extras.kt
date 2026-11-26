@@ -494,21 +494,27 @@ object Extras {
     }
 
     /** Hängt hinter den letzten Messwert bis jetzt vorläufige Punkte an: Solar und Wind aus der Prognose, alles andere fortgeschrieben. */
-    private fun extendToNow(s: MixSeries, day: LocalDate): MixSeries {
+    private fun forecastMapDays(type: String, days: List<LocalDate>): java.util.TreeMap<Long, Double> {
+        val m = java.util.TreeMap<Long, Double>()
+        for (d in days) m.putAll(forecastMap(type, d))
+        return m
+    }
+
+    private fun extendToNow(s: MixSeries, days: List<LocalDate>): MixSeries {
         val n = s.t.size
         if (n < 2) return s
         val stepS = s.t[n - 1] - s.t[n - 2]
         if (stepS != 900L) return s
         val now = System.currentTimeMillis() / 1000
         val lastT = s.t[n - 1]
-        val add = ((now - lastT) / 900).toInt().coerceAtMost(16)
+        val add = ((now - lastT) / 900).toInt().coerceAtMost(24)
         if (add < 1) return s
         val hourNow = java.time.ZonedDateTime.now(berlin).hour
         val solarNow = s.v["Solar"]?.get(n - 1) ?: 0.0
-        val solar = if (solarNow < 50.0 && (hourNow >= 17 || hourNow < 7)) java.util.TreeMap<Long, Double>() else forecastMap("solar", day)
+        val solar = if (solarNow < 50.0 && (hourNow >= 17 || hourNow < 7)) java.util.TreeMap<Long, Double>() else forecastMapDays("solar", days)
         val loadFc = java.util.TreeMap<Long, Double>()
         val wind = java.util.TreeMap<Long, Double>()
-        for (ty in listOf("wind_onshore", "wind_offshore")) for ((k, v) in forecastMap(ty, day)) wind[k] = (wind[k] ?: 0.0) + v
+        for (ty in listOf("wind_onshore", "wind_offshore")) for ((k, v) in forecastMapDays(ty, days)) wind[k] = (wind[k] ?: 0.0) + v
         if (solar.isEmpty() && wind.isEmpty()) return s
         fun at(m: java.util.TreeMap<Long, Double>, ts: Long): Double? {
             val e = m.floorEntry(ts) ?: return null
@@ -550,8 +556,11 @@ object Extras {
     suspend fun extendMixNow(s: MixSeries): MixSeries = withContext(Dispatchers.IO) {
         val today = LocalDate.now(berlin)
         if (s.estFrom in 0 until s.t.size) return@withContext s
-        if (Instant.ofEpochSecond(s.t.last()).atZone(berlin).toLocalDate() != today) return@withContext s
-        val e = try { extendToNow(s, today) } catch (ex: Exception) { s }
+        // Letzter Messwert von heute, oder (kurz nach Mitternacht, wenn die Daten hinterherhinken) von gestern: dann beide Tage der Prognose nutzen
+        val lastDay = Instant.ofEpochSecond(s.t.last()).atZone(berlin).toLocalDate()
+        if (lastDay != today && lastDay != today.minusDays(1)) return@withContext s
+        val days = if (lastDay == today) listOf(today) else listOf(today.minusDays(1), today)
+        val e = try { extendToNow(s, days) } catch (ex: Exception) { s }
         if (e !== s) synchronized(mixCache) { mixCache[0] = System.currentTimeMillis() to e }
         e
     }
