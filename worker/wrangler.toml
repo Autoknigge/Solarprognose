@@ -10,7 +10,7 @@ routes = [
 
 # Hintergrundlauf: hält die Energy-Charts-Reihen frisch, damit die App sofort Daten bekommt.
 [triggers]
-crons = ["*/7 * * * *"]
+crons = ["*/10 * * * *"]
 
 # Dauerhafter Speicher. Die ID trägt der Workflow beim Veröffentlichen ein (legt den Speicher bei Bedarf an).
 [[kv_namespaces]]

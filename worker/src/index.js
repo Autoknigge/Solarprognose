@@ -254,7 +254,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function warm(env) {
   if (!env.CACHE) return;
   const gap = env.WARM_GAP_MS !== undefined ? Number(env.WARM_GAP_MS) : 20000;
-  // KV erlaubt im kostenlosen Tarif nur 1000 Schreibvorgänge am Tag: Live-Reihen höchstens alle 7 Minuten, Prognosen alle 30, keine Sperr-Einträge
+  // KV erlaubt im kostenlosen Tarif nur 1000 Schreibvorgänge am Tag: Live-Reihen höchstens alle 10 Minuten, Prognosen alle 30, keine Sperr-Einträge
   const today = berlinDate(0);
   const yesterday = berlinDate(-1);
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", hour12: false }).format(new Date()));
