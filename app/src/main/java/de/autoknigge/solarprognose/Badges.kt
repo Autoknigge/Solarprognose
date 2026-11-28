@@ -13,11 +13,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -28,13 +29,19 @@ import java.time.ZoneOffset
 
 enum class BadgeKind { SUN, WIND, TANK }
 
-/** 0 rot, 1 gold, 2 grün, sonst grau. */
+/** 0 dunkelrot, 1 hellrot, 2 orange, 3 gold, 4 hellgrün, 5 dunkelgrün, sonst grau. */
 fun badgeColor(state: Int): Color = when (state) {
-    0 -> Color(0xFFE53935)
-    1 -> Color(0xFFF59E1B)
-    2 -> Color(0xFF2EAF62)
+    0 -> Color(0xFF9B1C1C)
+    1 -> Color(0xFFEF4B43)
+    2 -> Color(0xFFF57C00)
+    3 -> Color(0xFFFFC21A)
+    4 -> Color(0xFF8BD04F)
+    5 -> Color(0xFF1B9A52)
     else -> Color(0xFF8A8A8A)
 }
+
+/** Stufe 0..5 aus Prozent und fünf Grenzen (aufsteigend). */
+fun badgeStep(util: Double, cuts: List<Double>): Int = cuts.count { util >= it }
 
 /**
  * Runde Anzeige mit Rand und Symbol in der Zustandsfarbe. Das Symbol (Sonne, Windrad-Mast, Speicher) füllt sich von unten
@@ -44,6 +51,7 @@ fun badgeColor(state: Int): Color = when (state) {
 fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, onClick: () -> Unit) {
     val col = badgeColor(state)
     val f = frac.coerceIn(0f, 1f)
+    val pump = ImageBitmap.imageResource(R.drawable.ic_pump)
     Box(Modifier.size(36.dp).clickable { onClick() }, contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
             val s = size.minDimension / 100f
@@ -86,15 +94,13 @@ fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, onClick:
                     drawCircle(col, radius = 2.4f * s, center = o(50f, 33f))
                 }
                 BadgeKind.TANK -> {
-                    val tank = Path().apply {
-                        moveTo(30f * s, 78f * s); lineTo(30f * s, 46f * s)
-                        quadraticBezierTo(50f * s, 14f * s, 70f * s, 46f * s)
-                        lineTo(70f * s, 78f * s); close()
-                    }
-                    drawPath(tank, dim)
-                    clipPath(tank) { clipRect(0f, (78f - f * 50f) * s, size.width, size.height) { drawRect(col) } }
-                    drawPath(tank, col, style = Stroke(3f * s))
-                    drawRect(col, o(26f, 78f), Size(48f * s, 4f * s))
+                    val dw = (39f * s).toInt()
+                    val dh = (52f * s).toInt()
+                    val off = androidx.compose.ui.unit.IntOffset((30.5f * s).toInt(), (24f * s).toInt())
+                    val sz = androidx.compose.ui.unit.IntSize(dw, dh)
+                    val tint = androidx.compose.ui.graphics.ColorFilter.tint(col)
+                    drawImage(pump, dstOffset = off, dstSize = sz, alpha = 0.35f, colorFilter = tint)
+                    clipRect(0f, (76f - f * 52f) * s, size.width, size.height) { drawImage(pump, dstOffset = off, dstSize = sz, colorFilter = tint) }
                 }
             }
         }

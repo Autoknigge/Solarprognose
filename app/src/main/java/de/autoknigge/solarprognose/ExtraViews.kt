@@ -505,13 +505,13 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                         } else capGw
                         val night = name == "Solar" && refGw < capGw * 0.02
                         val util = if (night) 0.0 else (prodGw / refGw * 100.0).coerceIn(0.0, 100.0)
-                        val st = if (night) -1 else if (name == "Solar") (if (util <= 25.0) 0 else if (util <= 75.0) 1 else 2) else (if (util <= 15.0) 0 else if (util <= 40.0) 1 else 2)
+                        val st = if (night) -1 else if (name == "Solar") badgeStep(util, listOf(12.0, 25.0, 50.0, 75.0, 90.0)) else badgeStep(util, listOf(7.0, 15.0, 27.0, 40.0, 55.0))
                         GaugeBadge(if (name == "Solar") BadgeKind.SUN else BadgeKind.WIND, (util / 100.0).toFloat(), st, if (night) "–" else Calc.fmt0(util) + "%") { showCap = !showCap }
                     }
                     if (name == "Erdgas" && gas != null) {
                         Spacer(Modifier.width(8.dp))
                         val diff = gas.avg?.let { gas.full - it }
-                        val st = when { diff == null -> -1; diff >= 0.0 -> 2; diff >= -15.0 -> 1; else -> 0 }
+                        val st = when { diff == null -> -1; diff >= 0.0 -> 5; diff >= -15.0 -> 3; else -> 1 }
                         GaugeBadge(BadgeKind.TANK, (gas.full / 100.0).toFloat().coerceIn(0f, 1f), st, Calc.fmt0(gas.full) + "%") { showGas = !showGas }
                     }
                 }
@@ -534,8 +534,8 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                 val capGw = if (name == "Wind") cap!!.windGw else cap!!.solarGw
                 val prodGw = avg(name) / 1000.0
                 Text(
-                    if (name == "Wind") "Wind: " + Calc.fmt1(prodGw) + " GW sind " + Calc.fmt1(prodGw / capGw * 100.0) + " % der installierten Leistung (" + Calc.fmt0(capGw) + " GW" + (if (cap!!.estimated) ", Richtwert" else ", Energy-Charts") + "). Rot bis 15 %, gold bis 40 %, darüber grün. Der Mast zeigt die Höhe wie ein Barometer."
-                    else "Solar: " + Calc.fmt1(prodGw) + " GW im Verhältnis zu dem, was bei klarem Himmel zu dieser Uhrzeit und Jahreszeit möglich wäre (" + Calc.fmt0(capGw) + " GW installiert" + (if (cap!!.estimated) ", Richtwert" else "") + "). Rot bis 25 %, gold bis 75 %, darüber grün. Im Sommer zählt damit mehr als im Winter.",
+                    if (name == "Wind") "Wind: " + Calc.fmt1(prodGw) + " GW sind " + Calc.fmt1(prodGw / capGw * 100.0) + " % der installierten Leistung (" + Calc.fmt0(capGw) + " GW" + (if (cap!!.estimated) ", Richtwert" else ", Energy-Charts") + "). Von dunkelrot (unter 7 %) über hellrot, orange und gold bis hell- und dunkelgrün (ab 55 %). Der Mast zeigt die Höhe wie ein Barometer."
+                    else "Solar: " + Calc.fmt1(prodGw) + " GW im Verhältnis zu dem, was bei klarem Himmel zu dieser Uhrzeit und Jahreszeit möglich wäre (" + Calc.fmt0(capGw) + " GW installiert" + (if (cap!!.estimated) ", Richtwert" else "") + "). Rot bis 25 %, gold bis 75 %, darüber grün, dazwischen abgestuft (dunkelrot unter 12 %, dunkelgrün ab 90 %). Im Sommer zählt damit mehr als im Winter.",
                     fontSize = 11.sp, color = LocalMuted.current, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
                 )
             }
