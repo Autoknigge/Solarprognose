@@ -447,7 +447,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                     if (cnt < 3 || gg < 150.0) return null
                     val r = ss / gg
-                    return if (r < 0.85 || r > 1.15) Math.pow(r.coerceIn(0.05, 1.6), 0.75) else 1.0
+                    return if (r < 0.85 || r > 1.15) Math.pow(r.coerceIn(0.05, 1.6), 0.5) else 1.0
                 }
                 // Tageswerte für Diagramme und Summen: gewähltes Modell
                 fun adjDay(d: Day): Day {
