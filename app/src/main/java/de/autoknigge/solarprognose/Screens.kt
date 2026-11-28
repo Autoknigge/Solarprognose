@@ -404,8 +404,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         if (obs.pct >= 85.0) f.coerceIn(0.15, 1.0) else null
                     }
                 }
-                // Gedämpft (Exponent 0,75): Satellit und DWD unterschätzen bei dichter Decke das tatsächliche Licht
-                val corrDay = Math.pow(satFactor ?: obsFactor ?: 1.0, 0.75)
+                // Gedämpft (Exponent 0,5): Satellit und DWD unterschätzen bei dichter Decke das tatsächliche Licht
+                val corrDay = Math.pow(satFactor ?: obsFactor ?: 1.0, 0.5)
                 // Mit Satellitenmessung: vergangener Teil des Tages aus der Messung. Für den Rest zählt nur die Abweichung der letzten ein bis zwei Stunden:
                 // Klart es auf, fällt die Korrektur weg; ziehen Wolken auf, greift sie sofort. Ohne Satellitendaten: Tageswert des Modells (ggf. nach DWD-Bewölkung).
                 // Ob die letzten Stunden hell genug für einen Satellitenvergleich waren, wird am Modell-neutralen Wert (ICON) entschieden,
@@ -431,8 +431,8 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                     }
                     if (cnt2 >= 1 && sm2 > 0.0 && (ss2 / sm2 < 0.85 || ss2 / sm2 > 1.15)) (ss2 / sm2).coerceIn(0.05, 1.6) else null
                 }
-                val corr = if (haveSat) Math.pow(recentFactor ?: 1.0, 0.75) else corrDay
-                val satIcon = if (haveSat && dSmIcon > 0.0) (if (satFactor != null) Math.pow(dSs / dSmIcon, 0.75) else 1.0) else null
+                val corr = if (haveSat) Math.pow(recentFactor ?: 1.0, 0.5) else corrDay
+                val satIcon = if (haveSat && dSmIcon > 0.0) (if (satFactor != null) Math.pow(dSs / dSmIcon, 0.5) else 1.0) else null
                 val restSel = restModel?.let { it * modelFk * corr }
                 val todayTotal = if (satIcon != null && restSel != null) (d0.kwh - (restModel ?: 0.0)) * satIcon + restSel else d0.kwh * modelFk * corr
                 val fk = if (d0.kwh > 0.0) todayTotal / d0.kwh else 1.0
