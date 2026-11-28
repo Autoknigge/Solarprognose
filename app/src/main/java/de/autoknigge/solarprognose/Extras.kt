@@ -557,7 +557,6 @@ object Extras {
         val windParts = listOf("wind_onshore", "wind_offshore").map { forecastMapDays(it, days) }
         if (windParts.all { it.isNotEmpty() }) for (p in windParts) for ((k, v) in p) wind[k] = (wind[k] ?: 0.0) + v
         // Wind (beide Teile) ist Pflicht; die Last-Prognose ist optional, sonst bleibt die letzte Last und die Bilanz-Lücke geht in den Import
-        if (wind.isEmpty()) return s
         fun at(m: java.util.TreeMap<Long, Double>, ts: Long): Double? {
             val e = m.floorEntry(ts) ?: return null
             return if (ts - e.key <= 3600L) e.value else null

@@ -479,7 +479,7 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
         val first = fmt(series.t[0], false)
         val lastT = series.t[n - 1]
         val head = if (s != null) {
-            (if (series.estFrom in 0..s) "Jetzt (vorläufig) " else if (s >= n - 1 && range != 2) "Aktuell " else "") + fmt(series.t[s.coerceIn(0, n - 1)], range != 2)
+            (if (series.estFrom in 0..s) "Jetzt (vorläufig) " else if (s >= n - 1 && range != 2) (if (range == 0 && series.estFrom < 0 && (System.currentTimeMillis() / 1000 - lastT) > 4500L) "Aktuell (Quelle ca. " + String.format(Locale.GERMANY, "%.1f", (System.currentTimeMillis() / 1000 - lastT) / 3600.0) + " Std. verzögert) " else "Aktuell ") else "") + fmt(series.t[s.coerceIn(0, n - 1)], range != 2)
         } else when (range) {
             0 -> "Heute bis " + String.format(Locale.GERMANY, "%02d:%02d Uhr", Instant.ofEpochSecond(lastT + 900).atZone(zone).hour, Instant.ofEpochSecond(lastT + 900).atZone(zone).minute)
             else -> "Durchschnitt $first bis ${fmt(lastT, false)}"
