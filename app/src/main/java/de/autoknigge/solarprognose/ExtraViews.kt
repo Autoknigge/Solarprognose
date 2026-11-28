@@ -432,7 +432,8 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
     var showGas by remember { mutableStateOf(false) }
     var showCap by remember { mutableStateOf(false) }
     var cap by remember { mutableStateOf<Extras.Capacity?>(null) }
-    LaunchedEffect(Unit) { cap = Extras.loadCapacity() }
+    var opt by remember { mutableStateOf<Extras.SolarOpt?>(null) }
+    LaunchedEffect(Unit) { cap = Extras.loadCapacity(); opt = Extras.loadSolarOptimum() }
     val colors = mapOf(
         "Kohle" to Color(0xFFA9896B), "Erdgas" to Color(0xFFD4714F), "Biomasse" to Color(0xFF2E8B57),
         "Wind" to Color(0xFF4B5A9E), "Wasserkraft" to Color(0xFF5FD0E6), "Pumpspeicher" to Color(0xFF7FA6D9), "Batterie" to Color(0xFFB07CD8), "Solar" to Color(0xFFE3B341), "Sonstige" to Color(0xFFA0A0A0),
@@ -500,10 +501,17 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                         Spacer(Modifier.width(8.dp))
                         val capGw = if (name == "Wind") cap!!.windGw else cap!!.solarGw
                         val prodGw = avg(name) / 1000.0
+                        val bz = ZoneId.of("Europe/Berlin")
+                        val todayD = java.time.LocalDate.now(bz)
+                        fun refAt(t: Long): Double {
+                            val o = opt
+                            val d = java.time.Instant.ofEpochSecond(t).atZone(bz).toLocalDate()
+                            return if (o != null && !d.isBefore(todayD.minusDays(1)) && !d.isAfter(todayD)) o.gw[((t % 86400L) / 900L).toInt().coerceIn(0, 95)] else clearSkyGw(t, capGw)
+                        }
                         val refGw = if (name == "Solar") {
-                            if (s != null) clearSkyGw(series.t[s.coerceIn(0, n - 1)], capGw) else series.t.map { clearSkyGw(it, capGw) }.average()
+                            if (s != null) refAt(series.t[s.coerceIn(0, n - 1)]) else series.t.map { refAt(it) }.average()
                         } else capGw
-                        val night = name == "Solar" && refGw < capGw * 0.02
+                        val night = name == "Solar" && refGw < 0.5
                         val util = if (night) 0.0 else (prodGw / refGw * 100.0).coerceIn(0.0, 100.0)
                         val st = if (night) -1 else if (name == "Solar") badgeStep(util, listOf(12.0, 25.0, 50.0, 75.0, 90.0)) else badgeStep(util, listOf(7.0, 15.0, 27.0, 40.0, 55.0))
                         GaugeBadge(if (name == "Solar") BadgeKind.SUN else BadgeKind.WIND, (util / 100.0).toFloat(), st, if (night) "–" else Calc.fmt0(util) + "%", "vom Möglichen") { showCap = !showCap }

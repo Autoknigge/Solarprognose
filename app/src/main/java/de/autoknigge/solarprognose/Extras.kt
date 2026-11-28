@@ -755,7 +755,7 @@ object Extras {
 
 
     /** Installierte Leistung in GW (Energy-Charts, monatlich). Bei Fehler grobe Richtwerte, damit die Auslastung trotzdem erscheint. */
-    class Capacity(val windGw: Double, val solarGw: Double, val estimated: Boolean)
+    class Capacity(val windGw: Double, val solarGw: Double, val estimated: Boolean, val solarBy: Map<Int, Double> = emptyMap())
 
     private var capCache: Pair<Long, Capacity>? = null
 
@@ -768,6 +768,7 @@ object Extras {
             var wind = 0.0
             var solar = 0.0
             var solarNet = 0.0
+            var solarData: org.json.JSONArray? = null
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
                 val nm = o.optString("name").lowercase()
@@ -777,18 +778,80 @@ object Extras {
                 val v = last ?: continue
                 when {
                     nm.contains("wind") && (nm.contains("onshore") || nm.contains("offshore")) -> wind += v
-                    nm.contains("solar") && (nm.contains("gross") || nm.contains("brutto")) -> solar = v
-                    nm.contains("solar") && solarNet == 0.0 -> solarNet = v
+                    nm.contains("solar") && (nm.contains("gross") || nm.contains("brutto")) -> { solar = v; solarData = d }
+                    nm.contains("solar") && solarNet == 0.0 -> { solarNet = v; if (solarData == null) solarData = d }
                 }
             }
             if (solar <= 0.0) solar = solarNet
             if (wind < 20.0 || solar < 20.0) return@withContext fallback
-            val c = Capacity(wind, solar, false)
+            // Verlauf der installierten Solarleistung je Monat (für den Vergleich mit früheren Jahren)
+            val by = HashMap<Int, Double>()
+            try {
+                val times = JSONObject(txt).optJSONArray("time")
+                val sd = solarData
+                if (times != null && sd != null) for (k in 0 until minOf(times.length(), sd.length())) {
+                    if (sd.isNull(k)) continue
+                    val ts = times.optString(k)
+                    val m = Regex("(\\d{1,2})\\.(\\d{4})").find(ts)
+                    val key = if (m != null) m.groupValues[2].toInt() * 100 + m.groupValues[1].toInt() else ts.toLongOrNull()?.let {
+                        val z = java.time.Instant.ofEpochSecond(it).atZone(berlin); z.year * 100 + z.monthValue
+                    }
+                    if (key != null) by[key] = sd.getDouble(k)
+                }
+            } catch (e: Exception) {
+            }
+            val c = Capacity(wind, solar, false, by)
             capCache = System.currentTimeMillis() to c
             c
         } catch (e: Exception) {
             fallback
         }
+    }
+
+
+    /** Bester Solarwert je Uhrzeit (UTC, 15-Minuten-Raster) um dieses Datum in den letzten drei Jahren, auf die heutige installierte Leistung hochgerechnet (GW). */
+    class SolarOpt(val gw: DoubleArray)
+
+    private var optCache: Pair<LocalDate, SolarOpt>? = null
+
+    suspend fun loadSolarOptimum(): SolarOpt? = withContext(Dispatchers.IO) {
+        val today = LocalDate.now(berlin)
+        optCache?.let { if (it.first == today) return@withContext it.second }
+        val cap = loadCapacity()
+        val best = DoubleArray(96)
+        var got = 0
+        for (yb in 1..3) {
+            try {
+                val center = today.minusYears(yb.toLong())
+                val txt = ecGet("https://api.energy-charts.info/public_power?country=de&start=" + center.minusDays(10) + "&end=" + center.plusDays(10))
+                val o = JSONObject(txt)
+                val ts = o.getJSONArray("unix_seconds")
+                val types = o.getJSONArray("production_types")
+                var sol: org.json.JSONArray? = null
+                for (i in 0 until types.length()) {
+                    val p = types.getJSONObject(i)
+                    if (p.optString("name").equals("Solar", ignoreCase = true)) { sol = p.optJSONArray("data"); break }
+                }
+                if (sol == null) continue
+                val then = cap.solarBy[center.year * 100 + center.monthValue]
+                val scale = if (then != null && then > 5.0) cap.solarGw / then else Math.pow(1.13, yb.toDouble())
+                var cnt = 0
+                for (i in 0 until minOf(ts.length(), sol.length())) {
+                    if (sol.isNull(i)) continue
+                    val v = sol.getDouble(i) / 1000.0 * scale
+                    val slot = ((ts.getLong(i) % 86400L) / 900L).toInt().coerceIn(0, 95)
+                    if (v > best[slot]) best[slot] = v
+                    cnt++
+                }
+                if (cnt > 100) got++
+            } catch (e: Exception) {
+            }
+        }
+        if (got == 0) return@withContext null
+        val sm = DoubleArray(96) { i -> (best[(i + 95) % 96] + best[i] * 2.0 + best[(i + 1) % 96]) / 4.0 }
+        val r = SolarOpt(sm)
+        optCache = today to r
+        r
     }
 
     class GasStorage(val full: Double, val avg: Double?, val date: String)
