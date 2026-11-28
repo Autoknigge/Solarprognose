@@ -380,7 +380,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         sm += h.gti * modelFk; smi += h.gti; ss += sv; cnt++
                     }
                     dCnt = cnt; dSm = sm; dSs = ss; dSmIcon = smi
-                    if (cnt >= 1 && sm >= 80.0 && (ss / sm < (if (cnt >= 2) 0.85 else 0.7) || ss / sm > (if (cnt >= 2) 1.15 else 1.3))) (ss / sm).coerceIn(0.05, 1.6) else null
+                    if (cnt >= 1 && smi >= 80.0 && sm > 0.0 && (ss / sm < (if (cnt >= 2) 0.85 else 0.7) || ss / sm > (if (cnt >= 2) 1.15 else 1.3))) (ss / sm).coerceIn(0.05, 1.6) else null
                 }
                 // Frühe Schätzung vor genug Satellitendaten: beobachtete Bewölkung (DWD) gegen Bewölkung des gewählten Modells
                 val obs = vm.obsCloud[plant.id]
@@ -401,14 +401,25 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         modelCloud = mc
                         fun tr(c: Double) = 1.0 - 0.75 * Math.pow((c / 100.0).coerceIn(0.0, 1.0), 3.4)
                         val f = tr(obs.pct) / tr(mc)
-                        if (obs.pct >= 85.0 && f < 0.75) f.coerceIn(0.15, 1.0) else null
+                        if (obs.pct >= 85.0) f.coerceIn(0.15, 1.0) else null
                     }
                 }
                 // Gedämpft (Exponent 0,75): Satellit und DWD unterschätzen bei dichter Decke das tatsächliche Licht
                 val corrDay = Math.pow(satFactor ?: obsFactor ?: 1.0, 0.75)
                 // Mit Satellitenmessung: vergangener Teil des Tages aus der Messung. Für den Rest zählt nur die Abweichung der letzten ein bis zwei Stunden:
                 // Klart es auf, fällt die Korrektur weg; ziehen Wolken auf, greift sie sofort. Ohne Satellitendaten: Tageswert des Modells (ggf. nach DWD-Bewölkung).
-                val haveSat = satMap != null && nowC != null && !eveningSwitch && dCnt >= 1
+                // Ob die letzten Stunden hell genug für einen Satellitenvergleich waren, wird am Modell-neutralen Wert (ICON) entschieden,
+    // sonst hinge die Korrektur davon ab, welches Modell gewählt ist.
+    var recentSmi = 0.0
+    if (satMap != null && nowC != null && !eveningSwitch) {
+        val lastH = Math.floor(nowC).toInt().coerceAtMost(forecast.hours.size - 1)
+        for (i in maxOf(0, lastH - 1)..lastH) {
+            val h = forecast.hours[i]
+            if (h.date != d0.date || h.gti < 40.0 || satMap[h.time] == null) continue
+            recentSmi += h.gti
+        }
+    }
+    val haveSat = satMap != null && nowC != null && !eveningSwitch && dCnt >= 1 && recentSmi >= 60.0
                 val recentFactor: Double? = if (!haveSat) null else {
                     var sm2 = 0.0; var ss2 = 0.0; var cnt2 = 0
                     val last = Math.floor(nowC!!).toInt().coerceAtMost(forecast.hours.size - 1)
@@ -418,7 +429,7 @@ fun HomeScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: () -> Unit, onSetti
                         val sv = satMap!![h.time] ?: continue
                         sm2 += h.gti * modelFk; ss2 += sv; cnt2++
                     }
-                    if (cnt2 >= 1 && sm2 >= 60.0 && (ss2 / sm2 < 0.85 || ss2 / sm2 > 1.15)) (ss2 / sm2).coerceIn(0.05, 1.6) else null
+                    if (cnt2 >= 1 && sm2 > 0.0 && (ss2 / sm2 < 0.85 || ss2 / sm2 > 1.15)) (ss2 / sm2).coerceIn(0.05, 1.6) else null
                 }
                 val corr = if (haveSat) Math.pow(recentFactor ?: 1.0, 0.75) else corrDay
                 val satIcon = if (haveSat && dSmIcon > 0.0) (if (satFactor != null) Math.pow(dSs / dSmIcon, 0.75) else 1.0) else null
