@@ -506,13 +506,13 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                         val night = name == "Solar" && refGw < capGw * 0.02
                         val util = if (night) 0.0 else (prodGw / refGw * 100.0).coerceIn(0.0, 100.0)
                         val st = if (night) -1 else if (name == "Solar") badgeStep(util, listOf(12.0, 25.0, 50.0, 75.0, 90.0)) else badgeStep(util, listOf(7.0, 15.0, 27.0, 40.0, 55.0))
-                        GaugeBadge(if (name == "Solar") BadgeKind.SUN else BadgeKind.WIND, (util / 100.0).toFloat(), st, if (night) "–" else Calc.fmt0(util) + "%") { showCap = !showCap }
+                        GaugeBadge(if (name == "Solar") BadgeKind.SUN else BadgeKind.WIND, (util / 100.0).toFloat(), st, if (night) "–" else Calc.fmt0(util) + "%", "vom Möglichen") { showCap = !showCap }
                     }
                     if (name == "Erdgas" && gas != null) {
                         Spacer(Modifier.width(8.dp))
                         val diff = gas.avg?.let { gas.full - it }
                         val st = when { diff == null -> -1; diff >= 0.0 -> 5; diff >= -15.0 -> 3; else -> 1 }
-                        GaugeBadge(BadgeKind.TANK, (gas.full / 100.0).toFloat().coerceIn(0f, 1f), st, Calc.fmt0(gas.full) + "%") { showGas = !showGas }
+                        GaugeBadge(BadgeKind.TANK, (gas.full / 100.0).toFloat().coerceIn(0f, 1f), st, Calc.fmt0(gas.full) + "%", "Füllstand") { showGas = !showGas }
                     }
                 }
                 Row(Modifier.weight(0.66f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {

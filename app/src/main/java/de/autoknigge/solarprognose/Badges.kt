@@ -48,11 +48,12 @@ fun badgeStep(util: Double, cuts: List<Double>): Int = cuts.count { util >= it }
  * wie ein Barometer bis [frac] (0..1). Zeichnung in einem 100×100-Raster.
  */
 @Composable
-fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, onClick: () -> Unit) {
+fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, caption: String? = null, onClick: () -> Unit) {
     val col = badgeColor(state)
     val f = frac.coerceIn(0f, 1f)
     val pump = ImageBitmap.imageResource(R.drawable.ic_pump)
-    Box(Modifier.size(36.dp).clickable { onClick() }, contentAlignment = Alignment.Center) {
+    androidx.compose.foundation.layout.Column(Modifier.clickable { onClick() }, horizontalAlignment = Alignment.CenterHorizontally) {
+    Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
             val s = size.minDimension / 100f
             fun o(x: Float, y: Float) = Offset(x * s, y * s)
@@ -108,6 +109,8 @@ fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, onClick:
             label, fontSize = 7.5.sp, color = Color.White, fontWeight = FontWeight.Bold,
             style = TextStyle(shadow = Shadow(Color.Black, Offset(0f, 0f), 5f))
         )
+    }
+    if (caption != null) Text(caption, fontSize = 8.sp, color = androidx.compose.ui.graphics.Color(0xFFB8B8B8), lineHeight = 9.sp, maxLines = 1)
     }
 }
 
