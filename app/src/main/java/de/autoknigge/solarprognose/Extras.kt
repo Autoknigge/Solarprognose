@@ -834,7 +834,9 @@ object Extras {
                 }
                 if (sol == null) continue
                 val then = cap.solarBy[center.year * 100 + center.monthValue]
-                val scale = if (then != null && then > 5.0) cap.solarGw / then else Math.pow(1.13, yb.toDouble())
+                // Ohne echten Wert der installierten Leistung für diesen Monat wird das Jahr nicht verwendet (keine Schätzung)
+                if (then == null || then <= 5.0 || cap.estimated) continue
+                val scale = cap.solarGw / then
                 var cnt = 0
                 for (i in 0 until minOf(ts.length(), sol.length())) {
                     if (sol.isNull(i)) continue
