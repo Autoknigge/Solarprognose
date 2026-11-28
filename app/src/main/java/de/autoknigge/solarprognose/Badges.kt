@@ -136,7 +136,7 @@ fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, caption:
             }
         }
     }
-    if (caption != null) Text(caption, fontSize = 8.sp, color = androidx.compose.ui.graphics.Color(0xFFB8B8B8), lineHeight = 9.sp, maxLines = 1)
+    if (caption != null) Text(caption, fontSize = 7.sp, color = androidx.compose.ui.graphics.Color(0xFFB8B8B8), lineHeight = 8.sp, maxLines = 1)
     }
 }
 
