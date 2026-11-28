@@ -21,7 +21,8 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -68,7 +69,6 @@ fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, caption:
                 radius = 36f * s, center = o(50f, 50f)
             )
             val dim = col.copy(alpha = 0.35f)
-            withTransform({ translate(0f, -10f * s); scale(0.66f, 0.66f, pivot = o(50f, 50f)) }) {
             when (kind) {
                 BadgeKind.SUN -> {
                     fun sun(c: Color) {
@@ -107,13 +107,34 @@ fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, caption:
                     clipRect(0f, (76f - f * 52f) * s, size.width, size.height) { drawImage(pump, dstOffset = off, dstSize = sz, colorFilter = tint) }
                 }
             }
+            // Prozentzahl mittig: über der gefüllten Fläche dunkel mit weißem Rand, sonst weiß mit schwarzem Rand
+            val yLine = (when (kind) { BadgeKind.SUN -> 77f - f * 54f; BadgeKind.WIND -> 80f - f * 44f; BadgeKind.TANK -> 76f - f * 52f }) * s
+            val ts = (if (label.length >= 4) 21f else 26f) * s
+            drawIntoCanvas { cv ->
+                val nc = cv.nativeCanvas
+                fun pass(top: Float, bottom: Float, fill: Int, edge: Int) {
+                    nc.save()
+                    nc.clipRect(0f, top, size.width, bottom)
+                    val pt = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        textSize = ts
+                    }
+                    val base = 50f * s + ts / 3f
+                    pt.style = android.graphics.Paint.Style.STROKE
+                    pt.strokeWidth = 3.2f * s
+                    pt.strokeJoin = android.graphics.Paint.Join.ROUND
+                    pt.color = edge
+                    nc.drawText(label, 50f * s, base, pt)
+                    pt.style = android.graphics.Paint.Style.FILL
+                    pt.color = fill
+                    nc.drawText(label, 50f * s, base, pt)
+                    nc.restore()
+                }
+                pass(0f, yLine, 0xFFFFFFFF.toInt(), 0xFF000000.toInt())
+                pass(yLine, size.height, 0xFF101010.toInt(), 0xFFFFFFFF.toInt())
             }
         }
-        Text(
-            label, fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.ExtraBold, maxLines = 1,
-            style = TextStyle(shadow = Shadow(Color.Black, Offset(0f, 0f), 6f)),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp)
-        )
     }
     if (caption != null) Text(caption, fontSize = 8.sp, color = androidx.compose.ui.graphics.Color(0xFFB8B8B8), lineHeight = 9.sp, maxLines = 1)
     }
