@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,7 +55,7 @@ fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, caption:
     val f = frac.coerceIn(0f, 1f)
     val pump = ImageBitmap.imageResource(R.drawable.ic_pump)
     androidx.compose.foundation.layout.Column(Modifier.clickable { onClick() }, horizontalAlignment = Alignment.CenterHorizontally) {
-    Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(50.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
             val s = size.minDimension / 100f
             fun o(x: Float, y: Float) = Offset(x * s, y * s)
@@ -67,6 +68,7 @@ fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, caption:
                 radius = 36f * s, center = o(50f, 50f)
             )
             val dim = col.copy(alpha = 0.35f)
+            withTransform({ translate(0f, -10f * s); scale(0.66f, 0.66f, pivot = o(50f, 50f)) }) {
             when (kind) {
                 BadgeKind.SUN -> {
                     fun sun(c: Color) {
@@ -105,10 +107,12 @@ fun GaugeBadge(kind: BadgeKind, frac: Float, state: Int, label: String, caption:
                     clipRect(0f, (76f - f * 52f) * s, size.width, size.height) { drawImage(pump, dstOffset = off, dstSize = sz, colorFilter = tint) }
                 }
             }
+            }
         }
         Text(
-            label, fontSize = 10.5.sp, color = Color.White, fontWeight = FontWeight.ExtraBold, maxLines = 1,
-            modifier = Modifier.background(Color(0xCC000000), androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).padding(horizontal = 2.5.dp, vertical = 0.5.dp)
+            label, fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.ExtraBold, maxLines = 1,
+            style = TextStyle(shadow = Shadow(Color.Black, Offset(0f, 0f), 6f)),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp)
         )
     }
     if (caption != null) Text(caption, fontSize = 8.sp, color = androidx.compose.ui.graphics.Color(0xFFB8B8B8), lineHeight = 9.sp, maxLines = 1)
