@@ -499,83 +499,20 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                     if ((name == "Wind" || name == "Solar") && cap != null) {
                         Spacer(Modifier.width(8.dp))
                         val capGw = if (name == "Wind") cap!!.windGw else cap!!.solarGw
-                        val util = (avg(name) / 1000.0 / capGw * 100.0).coerceIn(0.0, 100.0)
-                        val bgc = when { util >= 40.0 -> Color(0xFF1E8E4E); util >= 15.0 -> Color(0xFFF59E1B); else -> Color(0xFFD32F2F) }
-                        val fgc = if (util in 15.0..39.999) Color.Black else Color.White
-                        val px = androidx.compose.ui.platform.LocalDensity.current.density
-                        val ball = Brush.radialGradient(
-                            listOf(androidx.compose.ui.graphics.lerp(bgc, Color.White, 0.45f), bgc, androidx.compose.ui.graphics.lerp(bgc, Color.Black, 0.55f)),
-                            center = Offset(10f * px, 8f * px), radius = 26f * px
-                        )
-                        val frac = (util / 100.0).toFloat().coerceIn(0f, 1f)
-                        val emptyCol = androidx.compose.ui.graphics.lerp(bgc, Color.Black, 0.62f)
-                        Box(
-                            Modifier.size(30.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                                .border(1.5.dp, Gold, androidx.compose.foundation.shape.CircleShape).clickable { showCap = !showCap },
-                            contentAlignment = androidx.compose.ui.Alignment.Center
-                        ) {
-                            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
-                                val w = size.width
-                                val h = size.height
-                                drawRect(emptyCol)
-                                val level = h * (1f - frac)
-                                drawRect(ball, topLeft = Offset(0f, level), size = androidx.compose.ui.geometry.Size(w, h - level))
-                                drawLine(Color(0xCCFFFFFF), Offset(0f, level), Offset(w, level), strokeWidth = 1.dp.toPx())
-                            }
-                            Text(
-                                Calc.fmt0(util) + "%", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold,
-                                style = androidx.compose.ui.text.TextStyle(shadow = androidx.compose.ui.graphics.Shadow(Color.Black, Offset(0f, 0f), 4f))
-                            )
-                        }
+                        val prodGw = avg(name) / 1000.0
+                        val refGw = if (name == "Solar") {
+                            if (s != null) clearSkyGw(series.t[s.coerceIn(0, n - 1)], capGw) else series.t.map { clearSkyGw(it, capGw) }.average()
+                        } else capGw
+                        val night = name == "Solar" && refGw < capGw * 0.02
+                        val util = if (night) 0.0 else (prodGw / refGw * 100.0).coerceIn(0.0, 100.0)
+                        val st = if (night) -1 else if (name == "Solar") (if (util <= 25.0) 0 else if (util <= 75.0) 1 else 2) else (if (util <= 15.0) 0 else if (util <= 40.0) 1 else 2)
+                        GaugeBadge(if (name == "Solar") BadgeKind.SUN else BadgeKind.WIND, (util / 100.0).toFloat(), st, if (night) "–" else Calc.fmt0(util) + "%") { showCap = !showCap }
                     }
                     if (name == "Erdgas" && gas != null) {
                         Spacer(Modifier.width(8.dp))
                         val diff = gas.avg?.let { gas.full - it }
-                        val bgc = when { diff == null -> Color(0xFF6B6B6B); diff >= 0.0 -> Color(0xFF1E8E4E); diff >= -15.0 -> Color(0xFFF59E1B); else -> Color(0xFFD32F2F) }
-                        val fgc = if (diff != null && diff < 0.0 && diff >= -15.0) Color.Black else Color.White
-                        val px = androidx.compose.ui.platform.LocalDensity.current.density
-                        val ball = Brush.radialGradient(
-                            listOf(androidx.compose.ui.graphics.lerp(bgc, Color.White, 0.45f), bgc, androidx.compose.ui.graphics.lerp(bgc, Color.Black, 0.55f)),
-                            center = Offset(10f * px, 8f * px), radius = 26f * px
-                        )
-                        val frac = (gas.full / 100.0).toFloat().coerceIn(0f, 1f)
-                        val emptyCol = androidx.compose.ui.graphics.lerp(bgc, Color.Black, 0.62f)
-                        Box(
-                            Modifier.size(30.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                                .border(1.5.dp, Gold, androidx.compose.foundation.shape.CircleShape).clickable { showGas = !showGas },
-                            contentAlignment = androidx.compose.ui.Alignment.Center
-                        ) {
-                            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
-                                val w = size.width
-                                val h = size.height
-                                drawRect(emptyCol)
-                                val level = h * (1f - frac)
-                                val amp = h * 0.045f
-                                val wave = androidx.compose.ui.graphics.Path().apply {
-                                    moveTo(0f, level)
-                                    var x = 0f
-                                    while (x <= w) {
-                                        lineTo(x, level + amp * Math.sin(x / w * 2.0 * Math.PI * 1.5).toFloat())
-                                        x += 1f
-                                    }
-                                    lineTo(w, h); lineTo(0f, h); close()
-                                }
-                                drawPath(wave, ball)
-                                val line = androidx.compose.ui.graphics.Path().apply {
-                                    var x = 0f
-                                    moveTo(0f, level)
-                                    while (x <= w) {
-                                        lineTo(x, level + amp * Math.sin(x / w * 2.0 * Math.PI * 1.5).toFloat())
-                                        x += 1f
-                                    }
-                                }
-                                drawPath(line, Color(0xCCFFFFFF), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()))
-                            }
-                            Text(
-                                Calc.fmt0(gas.full) + "%", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold,
-                                style = androidx.compose.ui.text.TextStyle(shadow = androidx.compose.ui.graphics.Shadow(Color.Black, Offset(0f, 0f), 4f))
-                            )
-                        }
+                        val st = when { diff == null -> -1; diff >= 0.0 -> 2; diff >= -15.0 -> 1; else -> 0 }
+                        GaugeBadge(BadgeKind.TANK, (gas.full / 100.0).toFloat().coerceIn(0f, 1f), st, Calc.fmt0(gas.full) + "%") { showGas = !showGas }
                     }
                 }
                 Row(Modifier.weight(0.66f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -595,8 +532,10 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
             }
             if ((name == "Wind" || name == "Solar") && cap != null && showCap) {
                 val capGw = if (name == "Wind") cap!!.windGw else cap!!.solarGw
+                val prodGw = avg(name) / 1000.0
                 Text(
-                    name + "-Auslastung: " + Calc.fmt1(avg(name) / 1000.0 / capGw * 100.0) + " % der installierten Leistung (" + Calc.fmt0(capGw) + " GW" + (if (cap!!.estimated) ", Richtwert" else ", Energy-Charts") + "). Grün ab 40 %, gelb ab 15 %, darunter rot.",
+                    if (name == "Wind") "Wind: " + Calc.fmt1(prodGw) + " GW sind " + Calc.fmt1(prodGw / capGw * 100.0) + " % der installierten Leistung (" + Calc.fmt0(capGw) + " GW" + (if (cap!!.estimated) ", Richtwert" else ", Energy-Charts") + "). Rot bis 15 %, gold bis 40 %, darüber grün. Der Mast zeigt die Höhe wie ein Barometer."
+                    else "Solar: " + Calc.fmt1(prodGw) + " GW im Verhältnis zu dem, was bei klarem Himmel zu dieser Uhrzeit und Jahreszeit möglich wäre (" + Calc.fmt0(capGw) + " GW installiert" + (if (cap!!.estimated) ", Richtwert" else "") + "). Rot bis 25 %, gold bis 75 %, darüber grün. Im Sommer zählt damit mehr als im Winter.",
                     fontSize = 11.sp, color = LocalMuted.current, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
                 )
             }
