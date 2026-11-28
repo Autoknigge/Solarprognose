@@ -28,6 +28,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -429,6 +430,9 @@ fun PriceCard(prices: List<PriceHour>, nowSec: Long) {
 @Composable
 fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStorage?, onRange: (Int) -> Unit) {
     var showGas by remember { mutableStateOf(false) }
+    var showCap by remember { mutableStateOf(false) }
+    var cap by remember { mutableStateOf<Extras.Capacity?>(null) }
+    LaunchedEffect(Unit) { cap = Extras.loadCapacity() }
     val colors = mapOf(
         "Kohle" to Color(0xFFA9896B), "Erdgas" to Color(0xFFD4714F), "Biomasse" to Color(0xFF2E8B57),
         "Wind" to Color(0xFF4B5A9E), "Wasserkraft" to Color(0xFF5FD0E6), "Pumpspeicher" to Color(0xFF7FA6D9), "Batterie" to Color(0xFFB07CD8), "Solar" to Color(0xFFE3B341), "Sonstige" to Color(0xFFA0A0A0),
@@ -492,6 +496,38 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Row(Modifier.weight(0.34f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     Text(label, fontSize = 13.sp, color = LocalInk.current)
+                    if ((name == "Wind" || name == "Solar") && cap != null) {
+                        Spacer(Modifier.width(8.dp))
+                        val capGw = if (name == "Wind") cap!!.windGw else cap!!.solarGw
+                        val util = (avg(name) / 1000.0 / capGw * 100.0).coerceIn(0.0, 100.0)
+                        val bgc = when { util >= 40.0 -> Color(0xFF1E8E4E); util >= 15.0 -> Color(0xFFF59E1B); else -> Color(0xFFD32F2F) }
+                        val fgc = if (util in 15.0..39.999) Color.Black else Color.White
+                        val px = androidx.compose.ui.platform.LocalDensity.current.density
+                        val ball = Brush.radialGradient(
+                            listOf(androidx.compose.ui.graphics.lerp(bgc, Color.White, 0.45f), bgc, androidx.compose.ui.graphics.lerp(bgc, Color.Black, 0.55f)),
+                            center = Offset(10f * px, 8f * px), radius = 26f * px
+                        )
+                        val frac = (util / 100.0).toFloat().coerceIn(0f, 1f)
+                        val emptyCol = androidx.compose.ui.graphics.lerp(bgc, Color.Black, 0.62f)
+                        Box(
+                            Modifier.size(30.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                .border(1.5.dp, Gold, androidx.compose.foundation.shape.CircleShape).clickable { showCap = !showCap },
+                            contentAlignment = androidx.compose.ui.Alignment.Center
+                        ) {
+                            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                                val w = size.width
+                                val h = size.height
+                                drawRect(emptyCol)
+                                val level = h * (1f - frac)
+                                drawRect(ball, topLeft = Offset(0f, level), size = androidx.compose.ui.geometry.Size(w, h - level))
+                                drawLine(Color(0xCCFFFFFF), Offset(0f, level), Offset(w, level), strokeWidth = 1.dp.toPx())
+                            }
+                            Text(
+                                Calc.fmt0(util) + "%", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold,
+                                style = androidx.compose.ui.text.TextStyle(shadow = androidx.compose.ui.graphics.Shadow(Color.Black, Offset(0f, 0f), 4f))
+                            )
+                        }
+                    }
                     if (name == "Erdgas" && gas != null) {
                         Spacer(Modifier.width(8.dp))
                         val diff = gas.avg?.let { gas.full - it }
@@ -556,6 +592,13 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                     Text(if (gwOnly) Calc.fmt2(avg(name) / 1000.0) + " GW" else Calc.fmt1(pct) + " % · " + Calc.fmt1(avg(name) / 1000.0) + " GW", fontSize = 13.sp, color = LocalInk.current, modifier = Modifier.padding(start = 6.dp), maxLines = 1)
                     Box(Modifier.weight((1f - w).coerceAtLeast(0.01f)))
                 }
+            }
+            if ((name == "Wind" || name == "Solar") && cap != null && showCap) {
+                val capGw = if (name == "Wind") cap!!.windGw else cap!!.solarGw
+                Text(
+                    name + "-Auslastung: " + Calc.fmt1(avg(name) / 1000.0 / capGw * 100.0) + " % der installierten Leistung (" + Calc.fmt0(capGw) + " GW" + (if (cap!!.estimated) ", Richtwert" else ", Energy-Charts") + "). Grün ab 40 %, gelb ab 15 %, darunter rot.",
+                    fontSize = 11.sp, color = LocalMuted.current, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                )
             }
             if (name == "Erdgas" && gas != null && showGas) {
                 Text(

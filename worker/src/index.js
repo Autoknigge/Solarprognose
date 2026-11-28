@@ -148,7 +148,7 @@ async function prices(url, ctx) {
 
 // Strommix (Energy-Charts, Fraunhofer ISE): nur erlaubte Abrufe, gemeinsamer Zwischenspeicher für alle Nutzer.
 // Energy-Charts begrenzt die Anfragen je IP-Adresse; so ruft nur der Worker ab, höchstens alle paar Minuten je Reihe.
-const EC_ENDPOINTS = new Set(["public_power", "cbpf", "cbet", "public_power_forecast", "ren_share_forecast"]);
+const EC_ENDPOINTS = new Set(["public_power", "cbpf", "cbet", "public_power_forecast", "ren_share_forecast", "installed_power"]);
 const EC_TYPES = new Set(["solar", "wind_onshore", "wind_offshore", "load"]);
 const EC_LIVE_TTL = 300; // Bereiche mit heutigem Tag: Daten kommen alle 15 Minuten
 const EC_LONG_TTL = 3600; // lange Bereiche (Jahr) und reine Vergangenheit
@@ -184,6 +184,11 @@ function ecPlan(endpoint, url) {
   let ttl = 900;
   let live = false;
   let key = `https://cache.invalid/ec/${endpoint}`;
+  if (endpoint === "installed_power") {
+    q.set("time_step", "monthly");
+    q.set("installation_decommission", "false");
+    return { key, ttl: 86400, live: false, upstream: `https://api.energy-charts.info/installed_power?${q.toString()}` };
+  }
   if (endpoint !== "ren_share_forecast") {
     const start = url.searchParams.get("start") || "";
     const end = url.searchParams.get("end") || "";

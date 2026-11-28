@@ -753,6 +753,44 @@ object Extras {
         out
     }
 
+
+    /** Installierte Leistung in GW (Energy-Charts, monatlich). Bei Fehler grobe Richtwerte, damit die Auslastung trotzdem erscheint. */
+    class Capacity(val windGw: Double, val solarGw: Double, val estimated: Boolean)
+
+    private var capCache: Pair<Long, Capacity>? = null
+
+    suspend fun loadCapacity(): Capacity = withContext(Dispatchers.IO) {
+        capCache?.let { if (System.currentTimeMillis() - it.first < 12L * 3600 * 1000) return@withContext it.second }
+        val fallback = Capacity(80.0, 120.0, true)
+        try {
+            val txt = ecGet("https://api.energy-charts.info/installed_power?country=de&time_step=monthly&installation_decommission=false")
+            val arr = JSONObject(txt).getJSONArray("production_types")
+            var wind = 0.0
+            var solar = 0.0
+            var solarNet = 0.0
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val nm = o.optString("name").lowercase()
+                val d = o.optJSONArray("data") ?: continue
+                var last: Double? = null
+                for (k in d.length() - 1 downTo 0) { if (!d.isNull(k)) { last = d.getDouble(k); break } }
+                val v = last ?: continue
+                when {
+                    nm.contains("wind") && (nm.contains("onshore") || nm.contains("offshore")) -> wind += v
+                    nm.contains("solar") && (nm.contains("gross") || nm.contains("brutto")) -> solar = v
+                    nm.contains("solar") && solarNet == 0.0 -> solarNet = v
+                }
+            }
+            if (solar <= 0.0) solar = solarNet
+            if (wind < 20.0 || solar < 20.0) return@withContext fallback
+            val c = Capacity(wind, solar, false)
+            capCache = System.currentTimeMillis() to c
+            c
+        } catch (e: Exception) {
+            fallback
+        }
+    }
+
     class GasStorage(val full: Double, val avg: Double?, val date: String)
 
     private var gasCache: Pair<Long, GasStorage>? = null
