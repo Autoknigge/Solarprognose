@@ -534,8 +534,8 @@ fun MixCard(range: Int, series: MixSeries?, failed: Boolean, gas: Extras.GasStor
                 val capGw = if (name == "Wind") cap!!.windGw else cap!!.solarGw
                 val prodGw = avg(name) / 1000.0
                 Text(
-                    if (name == "Wind") "Wind: " + Calc.fmt1(prodGw) + " GW sind " + Calc.fmt1(prodGw / capGw * 100.0) + " % der installierten Leistung (" + Calc.fmt0(capGw) + " GW" + (if (cap!!.estimated) ", Richtwert" else ", Energy-Charts") + "). Von dunkelrot (unter 7 %) über hellrot, orange und gold bis hell- und dunkelgrün (ab 55 %). Der Mast zeigt die Höhe wie ein Barometer."
-                    else "Solar: " + Calc.fmt1(prodGw) + " GW im Verhältnis zu dem, was bei klarem Himmel zu dieser Uhrzeit und Jahreszeit möglich wäre (" + Calc.fmt0(capGw) + " GW installiert" + (if (cap!!.estimated) ", Richtwert" else "") + "). Rot bis 25 %, gold bis 75 %, darüber grün, dazwischen abgestuft (dunkelrot unter 12 %, dunkelgrün ab 90 %). Im Sommer zählt damit mehr als im Winter.",
+                    if (name == "Wind") Calc.fmt1(prodGw) + " GW = " + Calc.fmt1(prodGw / capGw * 100.0) + " % der installierten Leistung (" + Calc.fmt0(capGw) + " GW" + (if (cap!!.estimated) ", Richtwert" else "") + ")"
+                    else Calc.fmt1(prodGw) + " GW im Verhältnis zum Optimum bei klarem Himmel zu dieser Uhr- und Jahreszeit (Installiert: " + Calc.fmt0(capGw) + " GW" + (if (cap!!.estimated) ", Richtwert" else "") + ").",
                     fontSize = 11.sp, color = LocalMuted.current, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
                 )
             }
